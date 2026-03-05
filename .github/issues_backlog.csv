@@ -1,0 +1,225 @@
+title,body,labels
+"[Phase 1] Module Metrics — kerning, espacement automatique","Objectif : Module pour gérer les métriques typographiques (kerning, espacement, line metrics).
+
+Critères d'acceptation
+- [ ] Gestion manuelle du kerning (get/set par paire)
+- [ ] Auto-kerning via FontForge engine
+- [ ] Auto-spacing
+- [ ] Side bearings management
+- [ ] Line metrics (ascent, descent, line_gap)
+- [ ] Rapport d'analyse des métriques
+- [ ] Tests unitaires","enhancement"
+"[Phase 1] Module Export — OTF, TTF, WOFF2, Variable Fonts","Objectif : Module d'export supportant tous les formats modernes de polices.
+
+Formats : OTF, TTF, WOFF/WOFF2, UFO, SVG Font, Variable Font
+
+Critères d'acceptation
+- [ ] Export OTF fonctionnel
+- [ ] Export TTF fonctionnel
+- [ ] Export WOFF2 fonctionnel
+- [ ] Export UFO fonctionnel
+- [ ] Export batch (tous formats)
+- [ ] Options de hinting à l'export
+- [ ] Tests avec validation des fichiers générés","enhancement"
+"[Phase 1] Module Contour — courbes Bézier et manipulation de paths","Objectif : Module de bas niveau pour la manipulation des courbes de Bézier et des paths vectoriels.
+
+Critères d'acceptation
+- [ ] Creation et modification de points (on-curve, off-curve)
+- [ ] Fermeture et ouverture de contours
+- [ ] Simplification des courbes (reduction de noeuds)
+- [ ] Lissage automatique des transitions
+- [ ] Inversion de direction
+- [ ] Conversion en SVG path
+- [ ] Tests avec contours complexes","enhancement"
+"[Phase 1] Font Analyzer utility — analyse de polices","Objectif : Utilitaire d'analyse rapide d'une police existante pour en extraire les métriques.
+
+Critères d'acceptation
+- [ ] Analyse des métriques globales (ascent, descent, units per em)
+- [ ] Comptage et liste des glyphes
+- [ ] Couverture Unicode (pourcentage du Latin, etc.)
+- [ ] Detection des problemes basiques
+- [ ] Score de qualite simple
+- [ ] Rapport exportable (dict/JSON)
+- [ ] Tests avec polices open source de reference","enhancement"
+"[Phase 2] Style Agent — transfert et application de styles","Objectif : Agent AI qui applique et transfere des styles typographiques.
+
+Tools : ApplyStroke, ApplySlant, TransformGlyph, InterpolateStyle, AnalyzeStyle
+
+Critères d'acceptation
+- [ ] Bold/Light par stroke
+- [ ] Italic par slant + corrections optiques
+- [ ] Analyse de style d'une police de reference
+- [ ] Application de transformations stylistiques
+- [ ] Tests comparatifs avant/apres","enhancement"
+"[Phase 2] Agent Orchestrator — chef d'orchestre multi-agents","Objectif : Creer l'orchestrateur qui coordonne les 5 agents AI specialises.
+
+Framework : LangGraph ou CrewAI pour l'orchestration
+Memoire partagee : Redis ou in-memory
+
+Critères d'acceptation
+- [ ] Initialisation des 5 agents
+- [ ] Pipeline sequentiel create_font()
+- [ ] Memoire partagee entre agents
+- [ ] Gestion des erreurs et retry
+- [ ] Logging detaille de chaque etape
+- [ ] Tests d'integration du pipeline complet","enhancement"
+"[Phase 2] Design Agent — generation de glyphes par prompt NL","Objectif : Agent AI qui cree et modifie des glyphes a partir de descriptions en langage naturel.
+
+Tools : CreateGlyph, ImportSVG, ModifyContour, PreviewGlyph, GenerateSVG
+
+Critères d'acceptation
+- [ ] Agent fonctionnel avec LLM (OpenAI/Claude)
+- [ ] 5+ tools implementes et testes
+- [ ] Generation de glyphes simples a partir de prompt
+- [ ] Modification de glyphes existants
+- [ ] Preview apres chaque action
+- [ ] Tests avec differents styles de prompts","enhancement"
+"[Phase 2] Metrics Agent — optimisation automatique des métriques","Objectif : Agent AI qui optimise automatiquement le kerning, l'espacement et les métriques.
+
+Tools : AnalyzeSpacing, AutoKern, SetKernPair, AutoSpace, SetSideBearings, GenerateReport
+
+Critères d'acceptation
+- [ ] Analyse automatique de la police
+- [ ] Suggestions de kerning basees sur le contexte
+- [ ] Application automatique des corrections
+- [ ] Rapport detaille avant/apres
+- [ ] Tests sur polices de reference","enhancement"
+"[Phase 2] QA Agent — validation et correction automatique","Objectif : Agent AI qui valide la qualite de la police et corrige les problemes.
+
+Verifications : contours ouverts, directions incorrectes, overlaps, points dupliques
+
+Tools : ValidateFont, FixOverlaps, CorrectDirections, SimplifyContours, GenerateQAReport
+
+Critères d'acceptation
+- [ ] Detection de tous les types de problemes
+- [ ] Correction automatique des problemes simples
+- [ ] Suggestions pour les problemes complexes
+- [ ] Rapport QA avec score de qualite (0-100)
+- [ ] Tests sur polices avec problemes connus","enhancement"
+"[Phase 2] Export Agent — generation intelligente des formats finaux","Objectif : Agent AI qui gere l'export intelligent avec optimisation par format.
+
+Tools : ExportOTF, ExportTTF, ExportWOFF2, ExportVariable, SubsetFont, GenerateSpecimen, GenerateCSS
+
+Critères d'acceptation
+- [ ] Export multi-format intelligent
+- [ ] Hinting automatique adapte au format
+- [ ] Subsetting par langue
+- [ ] Variable font generation
+- [ ] Package complet avec specimen + CSS
+- [ ] Tests de validation des fichiers exportes","enhancement"
+"[Phase 3] API REST FastAPI — serveur et endpoints CRUD","Objectif : Creer le serveur API REST avec FastAPI pour exposer AIFont comme service.
+
+Stack : FastAPI + Uvicorn, PostgreSQL, Redis, Celery
+
+Critères d'acceptation
+- [ ] Serveur FastAPI fonctionnel
+- [ ] CRUD complet pour les polices
+- [ ] Endpoint de generation async avec Celery
+- [ ] Authentification JWT
+- [ ] Documentation OpenAPI auto-generee
+- [ ] Tests d'integration API
+- [ ] Rate limiting et validation des inputs","enhancement"
+"[Phase 3] Authentification & Gestion des utilisateurs","Objectif : Systeme d'authentification securise avec gestion des roles et quotas.
+
+Stack : JWT, OAuth2 (Google/GitHub), PostgreSQL
+
+Critères d'acceptation
+- [ ] Inscription et connexion fonctionnels
+- [ ] OAuth2 Google et GitHub integres
+- [ ] JWT refresh tokens
+- [ ] Gestion des roles et permissions
+- [ ] Systeme de quotas par plan
+- [ ] API keys generables et revocables
+- [ ] Tests de securite (OWASP Top 10)","enhancement"
+"[Phase 3] Interface Web — AIFont Studio frontend","Objectif : Interface web React pour interagir avec AIFont via le navigateur.
+
+Stack : React 18, TypeScript, Tailwind CSS, Vite
+
+Critères d'acceptation
+- [ ] Interface de prompt NL fonctionnelle
+- [ ] Preview de la police en temps reel
+- [ ] Editeur de glyphes basique
+- [ ] Gestion multi-projets
+- [ ] Export multi-format depuis l'interface
+- [ ] Design responsive (desktop + tablette)
+- [ ] Tests E2E avec Playwright","enhancement"
+"[Phase 3] Pipeline CI/CD — integration et deploiement continus","Objectif : Mettre en place un pipeline CI/CD robuste pour automatiser tests et deploiements.
+
+Stack : GitHub Actions, Docker, AWS/GCP ou Render
+
+Critères d'acceptation
+- [ ] CI : lint, tests, build a chaque push
+- [ ] CD : deploiement auto en staging sur merge
+- [ ] Deploiement production avec approbation manuelle
+- [ ] Rollback automatique en cas d'echec
+- [ ] Notifications Slack/Discord
+- [ ] Monitoring post-deploiement","enhancement"
+"[Phase 3] Containerisation Docker & orchestration","Objectif : Containeriser tous les services AIFont et orchestrer avec Docker Compose / Kubernetes.
+
+Services : api (FastAPI), worker (Celery), frontend (React/Nginx), db (PostgreSQL), cache (Redis), fontforge
+
+Critères d'acceptation
+- [ ] Dockerfile pour chaque service
+- [ ] docker-compose.yml pour developpement local
+- [ ] docker-compose.prod.yml pour production
+- [ ] Health checks pour tous les services
+- [ ] Volumes persistants pour PostgreSQL
+- [ ] Variables d'environnement securisees
+- [ ] Documentation de demarrage rapide","enhancement"
+"[Phase 3] Documentation API & guides utilisateur","Objectif : Documentation complete pour les developpeurs et les utilisateurs finaux d'AIFont.
+
+Stack : MkDocs Material, GitHub Pages
+
+Critères d'acceptation
+- [ ] Guide de demarrage rapide (5 min)
+- [ ] Documentation complete du SDK Python
+- [ ] Exemples de code pour chaque fonctionnalite
+- [ ] Tutoriels video ou GIF pour les flux principaux
+- [ ] Documentation API interactive (Swagger)
+- [ ] Deployee automatiquement via GitHub Pages
+- [ ] Traduction FR/EN","documentation"
+"[Phase 3] Monitoring & Observabilite — metriques et alertes","Objectif : Mettre en place le monitoring complet de la plateforme AIFont.
+
+Stack : Prometheus + Grafana, Sentry, Loki
+
+Critères d'acceptation
+- [ ] Metriques Prometheus dans chaque service
+- [ ] Dashboard Grafana pour les KPIs principaux
+- [ ] Alertes configurees (latence, erreurs, ressources)
+- [ ] Tracking d'erreurs avec Sentry
+- [ ] Logs centralises avec Loki
+- [ ] Runbook de reponse aux incidents","enhancement"
+"[Phase 3] Base de donnees — migrations et gestion du schema","Objectif : Mettre en place le schema PostgreSQL et le systeme de migrations pour AIFont.
+
+Stack : PostgreSQL 15, Alembic, SQLAlchemy
+
+Critères d'acceptation
+- [ ] Schema initial complet avec contraintes
+- [ ] Systeme de migrations Alembic operationnel
+- [ ] Seeds de donnees de test
+- [ ] Backup et restore documentes
+- [ ] Indexes optimises pour les requetes frequentes
+- [ ] Tests d'integration avec base de donnees reelle","enhancement"
+"[Phase 3] Tests & Qualite — framework et couverture","Objectif : Mettre en place un framework de tests complet pour garantir la qualite d'AIFont.
+
+Stack : pytest, pytest-asyncio, httpx, Playwright, locust
+
+Critères d'acceptation
+- [ ] Couverture > 80% sur le SDK Python
+- [ ] Tests d'integration pour tous les endpoints API
+- [ ] Tests E2E pour les flux principaux du frontend
+- [ ] Tests de charge (100 utilisateurs simultanes)
+- [ ] Rapport de couverture automatique sur chaque PR
+- [ ] Badge de couverture dans le README","enhancement"
+"[Phase 4] Support Variable Fonts — axes et instances","Objectif : Support complet des polices variables (OpenType Variable Fonts) dans AIFont.
+
+Axes de variation : poids (wght), largeur (wdth), italique (ital), optique (opsz)
+
+Critères d'acceptation
+- [ ] Definition d'axes de variation
+- [ ] Creation de masters (Regular, Bold, etc.)
+- [ ] Interpolation automatique entre masters
+- [ ] Export Variable Font TTF
+- [ ] Instances nommees configurables
+- [ ] Preview de l'interpolation
+- [ ] Tests de conformite OpenType","enhancement"
