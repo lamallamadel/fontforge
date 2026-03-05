@@ -1,0 +1,467 @@
+name: Create AIFont Project Issues
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  create-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create project issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          create_issue_if_not_exists() {
+            local title="$1"
+            local body="$2"
+            local label="${3:-enhancement}"
+
+            if gh issue list --repo "$GH_REPO" --state open --search "\"$title\"" --json title | \
+               python3 -c "import sys,json; issues=json.load(sys.stdin); exit(0 if any(i['title']==sys.argv[1] for i in issues) else 1)" "$title" 2>/dev/null; then
+              echo "Issue already exists: $title"
+            else
+              gh issue create \
+                --repo "$GH_REPO" \
+                --title "$title" \
+                --body "$body" \
+                --label "$label"
+              echo "Created: $title"
+            fi
+          }
+
+          # ── Phase 1 ──────────────────────────────────────────────────────
+
+          create_issue_if_not_exists \
+            "[Phase 1] Module Metrics — kerning, espacement automatique" \
+            "Objectif : Module pour gérer les métriques typographiques (kerning, espacement, line metrics).
+
+          API cible
+          \`\`\`python
+          metrics = font.metrics
+          # Kerning
+          metrics.set_kern(\"A\", \"V\", -80)
+          metrics.get_kern(\"A\", \"V\")       # → -80
+          metrics.auto_kern()               # Auto-kerning via FontForge
+          # Espacement
+          metrics.auto_space()              # Auto-spacing
+          metrics.set_sidebearings(\"A\", left=50, right=50)
+          # Line metrics
+          metrics.ascent = 800
+          metrics.descent = 200
+          metrics.line_gap = 0
+          # Analyse
+          metrics.report()  # → dict avec toutes les métriques
+          \`\`\`
+
+          Critères d'acceptation
+          - [ ] Gestion manuelle du kerning (get/set par paire)
+          - [ ] Auto-kerning via FontForge engine
+          - [ ] Auto-spacing
+          - [ ] Side bearings management
+          - [ ] Line metrics (ascent, descent, line_gap)
+          - [ ] Rapport d'analyse des métriques
+          - [ ] Tests unitaires
+
+          Labels : phase-1, core" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 1] Module Export — OTF, TTF, WOFF2, Variable Fonts" \
+            "Objectif : Module d'export supportant tous les formats modernes de polices.
+
+          Formats : OTF, TTF, WOFF/WOFF2, UFO, SVG Font, Variable Font
+
+          API cible
+          \`\`\`python
+          from aifont.core.export import Exporter
+          exporter = Exporter(font)
+          exporter.to_otf(\"output.otf\")
+          exporter.to_ttf(\"output.ttf\")
+          exporter.to_woff2(\"output.woff2\")
+          exporter.to_ufo(\"output.ufo\")
+          exporter.to_variable(\"output-variable.ttf\", axes=[\"wght\"])
+          exporter.export_all(\"./dist/\")   # tous les formats
+          \`\`\`
+
+          Critères d'acceptation
+          - [ ] Export OTF fonctionnel
+          - [ ] Export TTF fonctionnel
+          - [ ] Export WOFF2 fonctionnel
+          - [ ] Export UFO fonctionnel
+          - [ ] Export batch (tous formats)
+          - [ ] Options de hinting à l'export
+          - [ ] Tests avec validation des fichiers générés
+
+          Labels : phase-1, core" \
+            "enhancement"
+
+          # ── Phase 2 ──────────────────────────────────────────────────────
+
+          create_issue_if_not_exists \
+            "[Phase 2] Agent Orchestrator — chef d'orchestre multi-agents" \
+            "Objectif : Créer l'orchestrateur qui coordonne les 5 agents AI spécialisés.
+
+          Framework : LangGraph ou CrewAI pour l'orchestration
+          Mémoire partagée : Redis ou in-memory
+          Communication : message passing inter-agents
+
+          Critères d'acceptation
+          - [ ] Initialisation des 5 agents
+          - [ ] Pipeline séquentiel create_font()
+          - [ ] Mémoire partagée entre agents
+          - [ ] Gestion des erreurs et retry
+          - [ ] Logging détaillé de chaque étape
+          - [ ] Tests d'intégration du pipeline complet
+
+          Labels : phase-2, ai-agents" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 2] Design Agent — génération de glyphes par prompt NL" \
+            "Objectif : Agent AI qui crée et modifie des glyphes à partir de descriptions en langage naturel.
+
+          Exemples de prompts :
+          - \"Crée la lettre A en style Art Déco avec des lignes géométriques\"
+          - \"Génère un alphabet serif élégant inspiré de Garamond\"
+          - \"Modifie le G pour qu'il soit plus arrondi\"
+
+          Tools : CreateGlyph, ImportSVG, ModifyContour, PreviewGlyph, GenerateSVG
+
+          Critères d'acceptation
+          - [ ] Agent fonctionnel avec LLM (OpenAI/Claude)
+          - [ ] 5+ tools implémentés et testés
+          - [ ] Génération de glyphes simples à partir de prompt
+          - [ ] Modification de glyphes existants
+          - [ ] Preview après chaque action
+          - [ ] Tests avec différents styles de prompts
+
+          Labels : phase-2, ai-agents" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 2] Metrics Agent — optimisation automatique des métriques" \
+            "Objectif : Agent AI qui optimise automatiquement le kerning, l'espacement et les métriques.
+
+          Tools : AnalyzeSpacing, AutoKern, SetKernPair, AutoSpace, SetSideBearings, GenerateReport
+
+          Critères d'acceptation
+          - [ ] Analyse automatique de la police
+          - [ ] Suggestions de kerning basées sur le contexte
+          - [ ] Application automatique des corrections
+          - [ ] Rapport détaillé avant/après
+          - [ ] Tests sur polices de référence
+
+          Labels : phase-2, ai-agents" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 2] QA Agent — validation et correction automatique" \
+            "Objectif : Agent AI qui valide la qualité de la police et corrige les problèmes.
+
+          Vérifications : contours ouverts, directions incorrectes, overlaps, points dupliqués, cohérence des traits, problèmes de hinting
+
+          Tools : ValidateFont, FixOverlaps, CorrectDirections, SimplifyContours, CheckConsistency, GenerateQAReport
+
+          Critères d'acceptation
+          - [ ] Détection de tous les types de problèmes
+          - [ ] Correction automatique des problèmes simples
+          - [ ] Suggestions pour les problèmes complexes
+          - [ ] Rapport QA avec score de qualité (0-100)
+          - [ ] Tests sur polices avec problèmes connus
+
+          Labels : phase-2, ai-agents" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 2] Export Agent — génération intelligente des formats finaux" \
+            "Objectif : Agent AI qui gère l'export intelligent avec optimisation par format.
+
+          Tools : ExportOTF, ExportTTF, ExportWOFF2, ExportVariable, SubsetFont, GenerateSpecimen, GenerateCSS
+
+          Critères d'acceptation
+          - [ ] Export multi-format intelligent
+          - [ ] Hinting automatique adapté au format
+          - [ ] Subsetting par langue
+          - [ ] Variable font generation
+          - [ ] Package complet avec specimen + CSS
+          - [ ] Tests de validation des fichiers exportés
+
+          Labels : phase-2, ai-agents" \
+            "enhancement"
+
+          # ── Phase 3 ──────────────────────────────────────────────────────
+
+          create_issue_if_not_exists \
+            "[Phase 3] API REST FastAPI — serveur et endpoints CRUD" \
+            "Objectif : Créer le serveur API REST avec FastAPI pour exposer AIFont comme service.
+
+          Stack : FastAPI + Uvicorn, PostgreSQL, Redis, Celery
+
+          Endpoints principaux
+          \`\`\`
+          POST   /fonts              # Créer une nouvelle police
+          GET    /fonts/{id}         # Récupérer une police
+          PUT    /fonts/{id}         # Mettre à jour une police
+          DELETE /fonts/{id}         # Supprimer une police
+          POST   /fonts/{id}/export  # Exporter dans un format
+          POST   /generate           # Générer une police par prompt
+          GET    /jobs/{id}          # Statut d'un job async
+          \`\`\`
+
+          Critères d'acceptation
+          - [ ] Serveur FastAPI fonctionnel
+          - [ ] CRUD complet pour les polices
+          - [ ] Endpoint de génération async avec Celery
+          - [ ] Authentification JWT
+          - [ ] Documentation OpenAPI auto-générée
+          - [ ] Tests d'intégration API
+          - [ ] Rate limiting et validation des inputs
+
+          Labels : phase-3, backend" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 3] Authentification & Gestion des utilisateurs" \
+            "Objectif : Système d'authentification sécurisé avec gestion des rôles et quotas.
+
+          Stack : JWT, OAuth2 (Google/GitHub), PostgreSQL
+
+          Fonctionnalités
+          - Inscription / connexion par email + mot de passe
+          - OAuth2 avec Google et GitHub
+          - Gestion des rôles : free, pro, enterprise
+          - Quotas d'utilisation par plan
+          - API keys pour accès programmatique
+
+          Critères d'acceptation
+          - [ ] Inscription et connexion fonctionnels
+          - [ ] OAuth2 Google et GitHub intégrés
+          - [ ] JWT refresh tokens
+          - [ ] Gestion des rôles et permissions
+          - [ ] Système de quotas par plan
+          - [ ] API keys générables et révocables
+          - [ ] Tests de sécurité (OWASP Top 10)
+
+          Labels : phase-3, backend, security" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 3] Interface Web — AIFont Studio frontend" \
+            "Objectif : Interface web React pour interagir avec AIFont via le navigateur.
+
+          Stack : React 18, TypeScript, Tailwind CSS, Vite
+
+          Fonctionnalités
+          - Éditeur de glyphes visuel (canvas)
+          - Prompt bar pour génération par NL
+          - Preview en temps réel de la police
+          - Gestion du projet de police
+          - Export et téléchargement
+
+          Critères d'acceptation
+          - [ ] Interface de prompt NL fonctionnelle
+          - [ ] Preview de la police en temps réel
+          - [ ] Éditeur de glyphes basique
+          - [ ] Gestion multi-projets
+          - [ ] Export multi-format depuis l'interface
+          - [ ] Design responsive (desktop + tablette)
+          - [ ] Tests E2E avec Playwright
+
+          Labels : phase-3, frontend" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 3] Pipeline CI/CD — intégration et déploiement continus" \
+            "Objectif : Mettre en place un pipeline CI/CD robuste pour automatiser tests et déploiements.
+
+          Stack : GitHub Actions, Docker, AWS/GCP ou Render
+
+          Pipeline
+          1. Push → lint + tests unitaires
+          2. PR → tests d'intégration + review
+          3. Merge main → build images Docker
+          4. Tag release → déploiement staging
+          5. Approbation manuelle → déploiement production
+
+          Critères d'acceptation
+          - [ ] CI : lint, tests, build à chaque push
+          - [ ] CD : déploiement auto en staging sur merge
+          - [ ] Déploiement production avec approbation manuelle
+          - [ ] Rollback automatique en cas d'échec
+          - [ ] Notifications Slack/Discord
+          - [ ] Monitoring post-déploiement
+
+          Labels : phase-3, devops" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 3] Containerisation Docker & orchestration" \
+            "Objectif : Containeriser tous les services AIFont et orchestrer avec Docker Compose / Kubernetes.
+
+          Services à containeriser
+          - api (FastAPI)
+          - worker (Celery)
+          - frontend (React / Nginx)
+          - db (PostgreSQL)
+          - cache (Redis)
+          - fontforge (service FontForge dédié)
+
+          Critères d'acceptation
+          - [ ] Dockerfile pour chaque service
+          - [ ] docker-compose.yml pour développement local
+          - [ ] docker-compose.prod.yml pour production
+          - [ ] Health checks pour tous les services
+          - [ ] Volumes persistants pour PostgreSQL
+          - [ ] Variables d'environnement sécurisées
+          - [ ] Documentation de démarrage rapide
+
+          Labels : phase-3, devops" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 3] Documentation API & guides utilisateur" \
+            "Objectif : Documentation complète pour les développeurs et les utilisateurs finaux d'AIFont.
+
+          Contenu
+          - Guide de démarrage rapide (5 min)
+          - Documentation API (auto-générée + enrichie)
+          - Tutoriels : créer sa première police IA
+          - Guide avancé : agents et personnalisation
+          - Référence SDK Python complet
+
+          Stack : MkDocs Material, GitHub Pages
+
+          Critères d'acceptation
+          - [ ] Guide de démarrage rapide (5 min)
+          - [ ] Documentation complète du SDK Python
+          - [ ] Exemples de code pour chaque fonctionnalité
+          - [ ] Tutoriels vidéo ou GIF pour les flux principaux
+          - [ ] Documentation API interactive (Swagger)
+          - [ ] Déployée automatiquement via GitHub Pages
+          - [ ] Traduction FR/EN
+
+          Labels : phase-3, documentation" \
+            "enhancement"
+
+          # ── Phase 4 ──────────────────────────────────────────────────────
+
+          create_issue_if_not_exists \
+            "[Phase 4] Font Analyzer — analyse et comparaison de polices" \
+            "Objectif : Module d'analyse permettant d'inspecter, comparer et benchmarker des polices.
+
+          API cible
+          \`\`\`python
+          from aifont.utils.font_analyzer import FontAnalyzer
+          analyzer = FontAnalyzer()
+          report = analyzer.analyze(\"font.otf\")
+          # → {\"glyphs\": 234, \"coverage\": 0.87, \"issues\": [...], ...}
+          diff = analyzer.compare(\"font_v1.otf\", \"font_v2.otf\")
+          score = analyzer.quality_score(\"font.otf\")  # 0-100
+          \`\`\`
+
+          Critères d'acceptation
+          - [ ] Analyse complète d'une police (métriques, glyphes, coverage Unicode)
+          - [ ] Détection des problèmes (overlaps, contours ouverts, etc.)
+          - [ ] Comparaison entre deux versions d'une police
+          - [ ] Score de qualité global (0-100)
+          - [ ] Rapport exportable (JSON, HTML)
+          - [ ] Tests avec polices de référence open source
+
+          Labels : phase-4, utils" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 4] Support Variable Fonts — axes et instances" \
+            "Objectif : Support complet des polices variables (OpenType Variable Fonts) dans AIFont.
+
+          Concepts
+          - Axes de variation : poids (wght), largeur (wdth), italique (ital), optique (opsz)
+          - Instances nommées : Regular, Bold, Light, etc.
+          - Interpolation entre masters
+
+          Critères d'acceptation
+          - [ ] Définition d'axes de variation
+          - [ ] Création de masters (Regular, Bold, etc.)
+          - [ ] Interpolation automatique entre masters
+          - [ ] Export Variable Font TTF
+          - [ ] Instances nommées configurables
+          - [ ] Preview de l'interpolation
+          - [ ] Tests de conformité OpenType
+
+          Labels : phase-4, core" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 4] Système de templates — bibliothèque de styles prédéfinis" \
+            "Objectif : Bibliothèque de templates de polices réutilisables pour accélérer la création.
+
+          Types de templates
+          - Sans-serif géométrique (style Futura)
+          - Serif classique (style Garamond)
+          - Monospace technique (style Fira Code)
+          - Script manuscrit
+          - Décorative / Display
+
+          Critères d'acceptation
+          - [ ] 5+ templates de base inclus
+          - [ ] API pour charger et instancier un template
+          - [ ] Personnalisation des templates (couleur, épaisseur, etc.)
+          - [ ] Sauvegarde de templates personnalisés
+          - [ ] Partage de templates entre utilisateurs (marketplace)
+          - [ ] Tests de rendu des templates
+
+          Labels : phase-4, feature" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 4] SDK JavaScript/TypeScript — client web AIFont" \
+            "Objectif : SDK JavaScript/TypeScript pour intégrer AIFont dans des applications web.
+
+          Fonctionnalités
+          \`\`\`typescript
+          import { AIFontClient } from '@aifont/sdk';
+          const client = new AIFontClient({ apiKey: 'your-key' });
+          const font = await client.generate('Create a bold geometric sans-serif');
+          const blob = await font.export('woff2');
+          \`\`\`
+
+          Critères d'acceptation
+          - [ ] Client REST TypeScript typé
+          - [ ] Support génération async avec polling
+          - [ ] Méthodes d'export (OTF, TTF, WOFF2)
+          - [ ] Gestion des erreurs et retry
+          - [ ] Publié sur npm (@aifont/sdk)
+          - [ ] Documentation et exemples
+          - [ ] Tests avec Jest
+
+          Labels : phase-4, sdk" \
+            "enhancement"
+
+          create_issue_if_not_exists \
+            "[Phase 4] Plugin FontForge natif — intégration directe" \
+            "Objectif : Plugin FontForge qui intègre les agents AIFont directement dans l'interface graphique de FontForge.
+
+          Fonctionnalités
+          - Panneau latéral AIFont dans FontForge
+          - Génération de glyphes par prompt depuis FontForge
+          - Auto-correction via QA Agent
+          - Auto-kerning via Metrics Agent
+          - Export intelligent via Export Agent
+
+          Critères d'acceptation
+          - [ ] Plugin installable via FontForge
+          - [ ] UI panel intégré dans FontForge
+          - [ ] Connexion à l'API AIFont configurable
+          - [ ] Génération de glyphes depuis le panneau
+          - [ ] Application des agents sur la police active
+          - [ ] Tests d'intégration avec FontForge
+
+          Labels : phase-4, plugin" \
+            "enhancement"
+
+          echo ""
+          echo "Done creating issues."
