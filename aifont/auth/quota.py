@@ -73,7 +73,7 @@ async def reset_quota_if_needed(quota: Quota, db: AsyncSession) -> Quota:
 # ---------------------------------------------------------------------------
 
 
-class QuotaExceeded(Exception):
+class QuotaExceededError(Exception):
     """Raised when a user exceeds one of their plan limits."""
 
     def __init__(self, detail: str) -> None:
@@ -81,12 +81,16 @@ class QuotaExceeded(Exception):
         super().__init__(detail)
 
 
+#: Alias for :class:`QuotaExceededError` (backward-compatible name).
+QuotaExceeded = QuotaExceededError
+
+
 async def check_export_quota(user: User, db: AsyncSession) -> None:
     """Raise QuotaExceeded if the user has exhausted their daily export quota."""
     quota = await get_or_create_quota(user, db)
     quota = await reset_quota_if_needed(quota, db)
     if quota.exports_today >= quota.max_exports_per_day:
-        raise QuotaExceeded(
+        raise QuotaExceededError(
             f"Daily export quota exhausted ({quota.max_exports_per_day}/day). "
             "Upgrade your plan for a higher limit."
         )
@@ -98,7 +102,7 @@ async def check_font_quota(user: User, db: AsyncSession) -> None:
     """Raise QuotaExceeded if the user has reached their maximum font count."""
     quota = await get_or_create_quota(user, db)
     if quota.fonts_created >= quota.max_fonts:
-        raise QuotaExceeded(
+        raise QuotaExceededError(
             f"Font quota exhausted ({quota.max_fonts} fonts). "
             "Upgrade your plan to create more fonts."
         )
@@ -111,7 +115,7 @@ async def check_api_key_quota(user: User, db: AsyncSession) -> None:
     quota = await get_or_create_quota(user, db)
     active_keys = sum(1 for k in user.api_keys if k.is_active)
     if active_keys >= quota.max_api_keys:
-        raise QuotaExceeded(
+        raise QuotaExceededError(
             f"API key quota exhausted ({quota.max_api_keys} active keys). "
             "Revoke an existing key or upgrade your plan."
         )

@@ -14,7 +14,6 @@ listed in the Font Analyzer issue:
 
 import json
 import os
-import sys
 import unittest
 
 # ---------------------------------------------------------------------------
@@ -34,6 +33,7 @@ def _fontforge_available() -> bool:
     """Return True only when the fontforge C extension is fully loaded."""
     try:
         import fontforge as _ff
+
         return callable(getattr(_ff, "open", None))
     except Exception:
         return False
@@ -154,8 +154,15 @@ class TestAnalyzerWithAmbrosia(unittest.TestCase):
 
     def test_to_dict_contains_required_keys(self):
         d = self.report.to_dict()
-        for key in ("font_path", "global_metrics", "glyph_count", "glyphs",
-                    "unicode_coverage", "problems", "quality_score"):
+        for key in (
+            "font_path",
+            "global_metrics",
+            "glyph_count",
+            "glyphs",
+            "unicode_coverage",
+            "problems",
+            "quality_score",
+        ):
             self.assertIn(key, d)
 
     def test_to_dict_global_metrics_keys(self):
@@ -236,13 +243,20 @@ class TestAnalyzerWithNotoTTF(unittest.TestCase):
 class TestAnalyzerUnitMetrics(unittest.TestCase):
     """Unit tests for quality score calculation logic (no font file needed)."""
 
-    def _make_report(self, ascent=800, descent=200, cap_height=700,
-                     x_height=500, latin_coverage_fraction=1.0,
-                     problems=None):
+    def _make_report(
+        self,
+        ascent=800,
+        descent=200,
+        cap_height=700,
+        x_height=500,
+        latin_coverage_fraction=1.0,
+        problems=None,
+    ):
         """Build a minimal FontReport programmatically for score testing."""
         from aifont.core.analyzer import (
-            FontReport, GlobalMetrics, GlyphInfo, UnicodeCoverage,
-            BasicProblem, UNICODE_RANGES, FontAnalyzer,
+            FontAnalyzer,
+            GlobalMetrics,
+            GlyphInfo,
         )
 
         metrics = GlobalMetrics(
@@ -268,14 +282,13 @@ class TestAnalyzerUnitMetrics(unittest.TestCase):
         basic_latin = list(range(0x0020, 0x007F))
         n = int(len(basic_latin) * latin_coverage_fraction)
         glyphs = [
-            GlyphInfo(name=f"uni{cp:04X}", unicode_value=cp, width=600,
-                      has_contours=True)
+            GlyphInfo(name=f"uni{cp:04X}", unicode_value=cp, width=600, has_contours=True)
             for cp in basic_latin[:n]
         ]
 
         # Compute coverage using the same logic as the real analyser.
         analyzer = FontAnalyzer.__new__(FontAnalyzer)
-        coverage = analyzer._compute_unicode_coverage(glyphs)
+        analyzer._compute_unicode_coverage(glyphs)
 
         probs = problems or []
         score = analyzer._compute_quality_score(metrics, glyphs, probs)
@@ -296,8 +309,7 @@ class TestAnalyzerUnitMetrics(unittest.TestCase):
 
         score_clean = self._make_report(problems=[])
         errors = [
-            BasicProblem(severity="error", glyph_name=None, description="x")
-            for _ in range(5)
+            BasicProblem(severity="error", glyph_name=None, description="x") for _ in range(5)
         ]
         score_with_errors = self._make_report(problems=errors)
         self.assertGreater(score_clean, score_with_errors)
@@ -313,8 +325,7 @@ class TestAnalyzerUnitMetrics(unittest.TestCase):
         from aifont.core.analyzer import BasicProblem
 
         many_errors = [
-            BasicProblem(severity="error", glyph_name=None, description="x")
-            for _ in range(100)
+            BasicProblem(severity="error", glyph_name=None, description="x") for _ in range(100)
         ]
         score = self._make_report(problems=many_errors)
         self.assertGreaterEqual(score, 0.0)

@@ -19,13 +19,18 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timezone
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
+
+sqlalchemy = pytest.importorskip(
+    "sqlalchemy",
+    reason="sqlalchemy not installed — skipping DB integration tests",
+)
+
+from sqlalchemy import create_engine, inspect  # noqa: E402
+from sqlalchemy.exc import IntegrityError  # noqa: E402
+from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Database URL — falls back gracefully so tests are skipped in CI without PG
@@ -61,9 +66,8 @@ requires_pg = pytest.mark.skipif(
 @pytest.fixture(scope="session")
 def db_engine():
     """Create engine and all tables once per test session."""
-    from aifont.db.database import Base
-
     import aifont.db.models  # noqa: F401 — populate metadata
+    from aifont.db.database import Base
 
     engine = create_engine(TEST_DATABASE_URL, echo=False)
     Base.metadata.create_all(engine)
@@ -77,7 +81,7 @@ def session(db_engine) -> Generator[Session, None, None]:
     """Provide a transactional session that is rolled back after each test."""
     connection = db_engine.connect()
     transaction = connection.begin()
-    Session_ = sessionmaker(bind=connection)
+    Session_ = sessionmaker(bind=connection)  # noqa: N806
     sess = Session_()
 
     yield sess
@@ -104,12 +108,12 @@ def seeded_session(session: Session) -> Session:
 def _make_user(session: Session, **kwargs):
     from aifont.db.models import User
 
-    defaults = dict(
-        email=f"user_{uuid.uuid4().hex[:8]}@example.com",
-        username=f"user_{uuid.uuid4().hex[:8]}",
-        password_hash="$2b$12$test_hash",
-        is_active=True,
-    )
+    defaults = {
+        "email": f"user_{uuid.uuid4().hex[:8]}@example.com",
+        "username": f"user_{uuid.uuid4().hex[:8]}",
+        "password_hash": "$2b$12$test_hash",
+        "is_active": True,
+    }
     defaults.update(kwargs)
     user = User(**defaults)
     session.add(user)
@@ -120,11 +124,11 @@ def _make_user(session: Session, **kwargs):
 def _make_project(session: Session, user_id, **kwargs):
     from aifont.db.models import FontProject, ProjectStatus
 
-    defaults = dict(
-        user_id=user_id,
-        name="Test Project",
-        status=ProjectStatus.DRAFT,
-    )
+    defaults = {
+        "user_id": user_id,
+        "name": "Test Project",
+        "status": ProjectStatus.DRAFT,
+    }
     defaults.update(kwargs)
     project = FontProject(**defaults)
     session.add(project)
@@ -135,12 +139,12 @@ def _make_project(session: Session, user_id, **kwargs):
 def _make_font(session: Session, project_id, **kwargs):
     from aifont.db.models import Font, FontStyle
 
-    defaults = dict(
-        project_id=project_id,
-        name="Test Font",
-        weight=400,
-        style=FontStyle.NORMAL,
-    )
+    defaults = {
+        "project_id": project_id,
+        "name": "Test Font",
+        "weight": 400,
+        "style": FontStyle.NORMAL,
+    }
     defaults.update(kwargs)
     font = Font(**defaults)
     session.add(font)
@@ -176,12 +180,28 @@ class TestSchemaExists:
     def test_users_columns(self, db_engine):
         inspector = inspect(db_engine)
         cols = {c["name"] for c in inspector.get_columns("users")}
-        assert {"id", "email", "username", "password_hash", "is_active", "created_at", "updated_at"}.issubset(cols)
+        assert {
+            "id",
+            "email",
+            "username",
+            "password_hash",
+            "is_active",
+            "created_at",
+            "updated_at",
+        }.issubset(cols)
 
     def test_fonts_columns(self, db_engine):
         inspector = inspect(db_engine)
         cols = {c["name"] for c in inspector.get_columns("fonts")}
-        assert {"id", "project_id", "name", "family_name", "weight", "style", "glyph_count"}.issubset(cols)
+        assert {
+            "id",
+            "project_id",
+            "name",
+            "family_name",
+            "weight",
+            "style",
+            "glyph_count",
+        }.issubset(cols)
 
     def test_glyphs_indexes(self, db_engine):
         inspector = inspect(db_engine)
@@ -335,7 +355,9 @@ class TestGlyphModel:
         session.add(Glyph(font_id=font.id, name="A", unicode_codepoint=0x41, advance_width=600))
         session.flush()
 
-        session.add(Glyph(font_id=font.id, name="A_alt", unicode_codepoint=0x41, advance_width=600))
+        session.add(
+            Glyph(font_id=font.id, name="A_alt", unicode_codepoint=0x41, advance_width=600)
+        )
         with pytest.raises(IntegrityError):
             session.flush()
 
@@ -365,10 +387,14 @@ class TestKernPairModel:
         project = _make_project(session, user.id)
         font = _make_font(session, project.id)
 
-        session.add(KernPair(font_id=font.id, left_glyph_name="A", right_glyph_name="V", value=-40))
+        session.add(
+            KernPair(font_id=font.id, left_glyph_name="A", right_glyph_name="V", value=-40)
+        )
         session.flush()
 
-        session.add(KernPair(font_id=font.id, left_glyph_name="A", right_glyph_name="V", value=-50))
+        session.add(
+            KernPair(font_id=font.id, left_glyph_name="A", right_glyph_name="V", value=-50)
+        )
         with pytest.raises(IntegrityError):
             session.flush()
 
@@ -398,7 +424,13 @@ class TestAgentModels:
         assert run.status == AgentRunStatus.PENDING
 
     def test_agent_task_confidence_range(self, session: Session):
-        from aifont.db.models import AgentRun, AgentRunStatus, AgentTask, AgentType, AgentTaskStatus
+        from aifont.db.models import (
+            AgentRun,
+            AgentRunStatus,
+            AgentTask,
+            AgentTaskStatus,
+            AgentType,
+        )
 
         user = _make_user(session)
         project = _make_project(session, user.id)
@@ -421,7 +453,13 @@ class TestAgentModels:
             session.flush()
 
     def test_cascade_tasks_on_run_delete(self, session: Session):
-        from aifont.db.models import AgentRun, AgentRunStatus, AgentTask, AgentType, AgentTaskStatus
+        from aifont.db.models import (
+            AgentRun,
+            AgentRunStatus,
+            AgentTask,
+            AgentTaskStatus,
+            AgentType,
+        )
 
         user = _make_user(session)
         project = _make_project(session, user.id)
@@ -500,7 +538,7 @@ class TestSeedData:
 
     def test_seed_relationship_integrity(self, seeded_session: Session):
         """Verify that all foreign key relationships are intact after seeding."""
-        from aifont.db.models import Font, FontProject, User
+        from aifont.db.models import Font
 
         for font in seeded_session.query(Font).all():
             assert font.project is not None
@@ -517,20 +555,14 @@ class TestQueryPerformance:
     def test_glyph_lookup_by_codepoint(self, seeded_session: Session):
         from aifont.db.models import Glyph
 
-        results = seeded_session.query(Glyph).filter(
-            Glyph.unicode_codepoint == 0x41
-        ).all()
+        results = seeded_session.query(Glyph).filter(Glyph.unicode_codepoint == 0x41).all()
         assert len(results) >= 1
         assert results[0].name == "A"
 
     def test_kern_pair_lookup(self, seeded_session: Session):
         from aifont.db.models import KernPair
 
-        results = (
-            seeded_session.query(KernPair)
-            .filter(KernPair.left_glyph_name == "A")
-            .all()
-        )
+        results = seeded_session.query(KernPair).filter(KernPair.left_glyph_name == "A").all()
         assert len(results) >= 1
 
     def test_agent_runs_filtered_by_status(self, seeded_session: Session):

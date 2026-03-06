@@ -15,10 +15,8 @@ POST   /fonts/analyze      — trigger async analysis of an uploaded font
 from __future__ import annotations
 
 import os
-import shutil
 import uuid
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
@@ -27,7 +25,6 @@ from aifont.api.config import get_settings
 from aifont.api.dependencies import CurrentUser, DBSession
 from aifont.api.models import AnalysisResult, Font
 from aifont.api.schemas import (
-    AnalysisResultRead,
     FontCreate,
     FontList,
     FontRead,
@@ -80,7 +77,7 @@ async def list_fonts(
     current_user: CurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    name: Optional[str] = Query(None, max_length=256),
+    name: str | None = Query(None, max_length=256),
 ) -> FontList:
     """Return a paginated list of fonts owned by the current user."""
     base_q = select(Font).where(Font.owner_id == current_user.id)
@@ -265,9 +262,7 @@ async def analyze_font(
 
 
 async def _get_owned_font(font_id: uuid.UUID, owner_id: uuid.UUID, db: DBSession) -> Font:
-    result = await db.execute(
-        select(Font).where(Font.id == font_id, Font.owner_id == owner_id)
-    )
+    result = await db.execute(select(Font).where(Font.id == font_id, Font.owner_id == owner_id))
     font = result.scalar_one_or_none()
     if font is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Font not found")

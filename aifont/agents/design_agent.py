@@ -1,19 +1,9 @@
-"""Design agent — generates glyphs from natural language prompts."""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional
-"""Design Agent — generates glyph outlines from natural language prompts."""
 """Design agent — generates glyph outlines from natural-language prompts."""
 
 from __future__ import annotations
 
-import logging
-from typing import Optional
-
-from aifont.core.font import Font
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from aifont.core.font import Font
@@ -23,9 +13,9 @@ if TYPE_CHECKING:
 class DesignResult:
     """Result from the DesignAgent."""
 
-    font: Optional["Font"]
+    font: Font | None
     glyph_name: str
-    svg_data: Optional[str] = None
+    svg_data: str | None = None
     confidence: float = 1.0
 
 
@@ -46,7 +36,7 @@ class DesignAgent:
     def run(
         self,
         prompt: str,
-        font: Optional["Font"] = None,
+        font: Font | None = None,
         unicode_point: int = 0x0041,
     ) -> DesignResult:
         """Process *prompt* and inject the resulting glyph into *font*.
@@ -69,17 +59,15 @@ class DesignAgent:
 
     def _extract_glyph_name(self, prompt: str) -> str:
         """Heuristically extract a glyph name from *prompt*."""
-        # Prefer uppercase single letters first
         for token in prompt.split():
             if len(token) == 1 and token.isupper():
                 return token
-        # Fall back to any single alpha character, uppercased
         for token in prompt.split():
             if len(token) == 1 and token.isalpha():
                 return token.upper()
         return "A"
 
-    def _generate_svg(self, prompt: str) -> Optional[str]:
+    def _generate_svg(self, prompt: str) -> str | None:
         """Generate an SVG path string for the requested glyph.
 
         When an LLM client is configured it is used; otherwise a
@@ -90,7 +78,6 @@ class DesignAgent:
                 return self._llm.generate_svg(prompt)
             except Exception:  # noqa: BLE001
                 pass
-        # Placeholder: a simple rectangular outline
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700">'
             '<path d="M 50 0 L 450 0 L 450 700 L 50 700 Z"/>'
@@ -99,7 +86,7 @@ class DesignAgent:
 
     def _inject_svg(
         self,
-        font: "Font",
+        font: Font,
         svg_data: str,
         unicode_point: int,
         glyph_name: str,
@@ -110,64 +97,10 @@ class DesignAgent:
 
         from aifont.core.svg_parser import svg_to_glyph
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".svg", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".svg", delete=False) as tmp:
             tmp.write(svg_data)
             tmp_path = tmp.name
         try:
             svg_to_glyph(tmp_path, font, unicode_point, glyph_name)
         finally:
             os.unlink(tmp_path)
-from aifont.agents.orchestrator import AgentResult
-
-logger = logging.getLogger(__name__)
-
-
-class DesignAgent:
-    """Generates or modifies glyph designs based on a text prompt.
-
-    The agent translates natural language descriptions (e.g. *"bold geometric A"*)
-    into SVG path data which is then imported into the font via
-    :mod:`aifont.core.svg_parser`.
-
-    Example:
-        >>> agent = DesignAgent()
-        >>> font = agent.run("Create a rounded sans-serif", font)
-    """
-
-    def run(self, prompt: str, font: Font) -> Font:
-        """Run the design step.
-
-        Args:
-            prompt: Natural language design instruction.
-            font:   Font to modify.
-
-        Returns:
-            The modified font.
-        """
-        logger.info("DesignAgent: processing prompt %r", prompt)
-        # In production: call LLM to generate SVG paths, then import via svg_parser
-        # For now, this is a no-op placeholder.
-        return font
-    """Generates glyphs from a natural-language description.
-
-    Workflow:
-    1. Passes the *prompt* to an LLM (via ``litellm`` if available) to obtain
-       an SVG ``<path d="…">`` string for each required glyph.
-    2. Writes the SVG to a temporary file and imports it via
-       :func:`~aifont.core.svg_parser.svg_to_glyph`.
-
-    When no LLM is configured the agent is a no-op (returns success with low
-    confidence) so that the rest of the pipeline can still proceed.
-    """
-
-    def run(self, prompt: str, font: Font) -> AgentResult:
-        logger.info("DesignAgent: processing prompt %r", prompt)
-        # LLM integration goes here — stub returns success.
-        return AgentResult(
-            agent_name="DesignAgent",
-            success=True,
-            confidence=0.8,
-            message="Design step skipped (no LLM configured)",
-        )

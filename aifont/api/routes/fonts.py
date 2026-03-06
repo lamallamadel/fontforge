@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Path, UploadFile
 from fastapi.responses import FileResponse
@@ -13,7 +13,7 @@ from pydantic import BaseModel
 router = APIRouter()
 
 # In-memory store keyed by font id (for demo purposes)
-_font_store: Dict[str, Any] = {}
+_font_store: dict[str, Any] = {}
 
 
 class AnalyzeResponse(BaseModel):
@@ -48,8 +48,8 @@ async def analyze_font(file: UploadFile = File(...)) -> AnalyzeResponse:
         tmp_path = tmp.name
 
     try:
-        from aifont.core.font import Font
         from aifont.core.analyzer import analyze
+        from aifont.core.font import Font
 
         font = Font.open(tmp_path)
         report = analyze(font)
@@ -77,8 +77,8 @@ async def analyze_font(file: UploadFile = File(...)) -> AnalyzeResponse:
 async def generate_font(request: GenerateRequest) -> GenerateResponse:
     """Generate a new font from a natural language prompt."""
     try:
-        from aifont.core.font import Font
         from aifont.agents.design_agent import DesignAgent
+        from aifont.core.font import Font
 
         font = Font.new(request.font_name)
         agent = DesignAgent()

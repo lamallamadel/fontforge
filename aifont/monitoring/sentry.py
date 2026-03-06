@@ -65,8 +65,8 @@ def setup_sentry(
 
     try:
         import sentry_sdk
-        from sentry_sdk.integrations.logging import LoggingIntegration
         from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
         from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
     except ImportError:
         logger.warning(

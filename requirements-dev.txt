@@ -15,7 +15,14 @@ python-multipart>=0.0.6
 
 # API framework
 fastapi>=0.100.0
-pydantic>=2.0
+pydantic[email]>=2.6.0
+
+# Database (required by aifont.auth.models and aifont.db)
+sqlalchemy[asyncio]>=2.0.0
+
+# Authentication (required by aifont.auth.jwt and aifont.auth.security)
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
 
 # Load testing
 locust>=2.0

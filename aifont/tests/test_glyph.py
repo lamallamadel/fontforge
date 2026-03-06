@@ -9,9 +9,8 @@ The integration tests are skipped when fontforge is not available.
 from __future__ import annotations
 
 import math
-import sys
 import unittest
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Detect FontForge availability
@@ -19,17 +18,17 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 try:
     import fontforge  # type: ignore
-    import psMat  # type: ignore
+
     _FONTFORGE_AVAILABLE = hasattr(fontforge, "font")
 except ImportError:
     _FONTFORGE_AVAILABLE = False
 
 from aifont.core.glyph import Glyph
 
-
 # ===========================================================================
 # Unit tests — using mock fontforge glyph objects (no compiled FontForge)
 # ===========================================================================
+
 
 class _MockFfGlyph:
     """Minimal in-memory stand-in for a ``fontforge.glyph`` object."""
@@ -65,19 +64,19 @@ class _MockFfGlyph:
         self._simplified = True
         self._simplify_args = (error_bound, flags)
 
-    def removeOverlap(self):
+    def removeOverlap(self):  # noqa: N802
         self._overlap_removed = True
 
-    def correctDirection(self):
+    def correctDirection(self):  # noqa: N802
         self._direction_corrected = True
 
-    def autoHint(self):
+    def autoHint(self):  # noqa: N802
         self._auto_hinted = True
 
     def round(self):
         self._rounded = True
 
-    def glyphPen(self):
+    def glyphPen(self):  # noqa: N802
         return MagicMock()
 
     def draw(self, pen):
@@ -98,10 +97,12 @@ class _MockFfGlyph:
             # Write a minimal 1×1 valid PNG
             import struct
             import zlib
+
             def _chunk(name, data):
                 c = struct.pack(">I", len(data)) + name + data
                 crc = struct.pack(">I", zlib.crc32(name + data) & 0xFFFFFFFF)
                 return c + crc
+
             sig = b"\x89PNG\r\n\x1a\n"
             ihdr = _chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
             raw = b"\x00\xff\xff\xff"
@@ -136,6 +137,7 @@ class _MockContour:
 # Test: Identity properties
 # ---------------------------------------------------------------------------
 
+
 class TestGlyphIdentity(unittest.TestCase):
     """Test name, unicode properties."""
 
@@ -168,6 +170,7 @@ class TestGlyphIdentity(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Test: Metrics (width, bearings)
 # ---------------------------------------------------------------------------
+
 
 class TestGlyphMetrics(unittest.TestCase):
     """Test width and side-bearing properties."""
@@ -215,6 +218,7 @@ class TestGlyphMetrics(unittest.TestCase):
 # Test: Contours
 # ---------------------------------------------------------------------------
 
+
 class TestGlyphContours(unittest.TestCase):
     """Test contour access and manipulation."""
 
@@ -245,6 +249,7 @@ class TestGlyphContours(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Test: add_contour (requires real fontforge.contour and fontforge.point)
 # ---------------------------------------------------------------------------
+
 
 @unittest.skipUnless(_FONTFORGE_AVAILABLE, "fontforge Python bindings not available")
 class TestGlyphAddContour(unittest.TestCase):
@@ -286,6 +291,7 @@ class TestGlyphAddContour(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Test: Typographic operations
 # ---------------------------------------------------------------------------
+
 
 class TestTypographicOps(unittest.TestCase):
     """Test simplify, remove_overlap, correct_direction, auto_hint, round."""
@@ -338,6 +344,7 @@ class TestTypographicOps(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Test: Geometric transformations
 # ---------------------------------------------------------------------------
+
 
 class TestGeometricTransforms(unittest.TestCase):
     """Test scale, rotate, move, skew, transform — via mock psMat."""
@@ -411,6 +418,7 @@ class TestGeometricTransforms(unittest.TestCase):
 # Test: Export — SVG / PNG
 # ---------------------------------------------------------------------------
 
+
 class TestGlyphExport(unittest.TestCase):
     """Test to_svg() and to_png() via the mock glyph's export method."""
 
@@ -453,6 +461,7 @@ class TestGlyphExport(unittest.TestCase):
 # Test: copy_from
 # ---------------------------------------------------------------------------
 
+
 class TestGlyphCopyFrom(unittest.TestCase):
     """Test copy_from() delegates to clear + draw."""
 
@@ -475,6 +484,7 @@ class TestGlyphCopyFrom(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Integration tests — require compiled FontForge
 # ---------------------------------------------------------------------------
+
 
 @unittest.skipUnless(_FONTFORGE_AVAILABLE, "fontforge Python bindings not available")
 class TestGlyphIntegration(unittest.TestCase):

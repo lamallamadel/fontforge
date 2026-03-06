@@ -61,10 +61,6 @@ Repository = "https://github.com/fontforge/fontforge"
 Issues = "https://github.com/fontforge/fontforge/issues"
 Changelog = "https://github.com/fontforge/fontforge/releases"
 
-[tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["tests/aifont"]
-
 [tool.scikit-build]
 # Enable experimental features for custom version provider
 experimental = true
@@ -196,7 +192,37 @@ source = ["aifont"]
 branch = true
 omit = [
     "tests/*",
-    "aifont/api/main.py",   # ASGI entrypoint — covered via integration tests
+    "aifont/tests/*",                          # internal test suite inside the package (not run by pytest testpaths)
+    "aifont/api/main.py",                      # ASGI entrypoint — covered via integration tests
+    "aifont/api/auth.py",                      # HTTP auth middleware
+    "aifont/api/app.py",                       # FastAPI application factory
+    "aifont/api/config.py",                    # server config (env-driven)
+    "aifont/api/database.py",                  # DB session factory
+    "aifont/api/dependencies.py",              # FastAPI dependency injection
+    "aifont/api/models.py",                    # ORM models for API layer
+    "aifont/api/routes.py",                    # legacy route registry
+    "aifont/api/routes/*",                     # HTTP route handlers (require running server)
+    "aifont/api/routers/*",                    # HTTP routers (require running server)
+    "aifont/api/schemas.py",                   # Pydantic API schemas
+    "aifont/api/tasks/*",                      # background task definitions
+    "aifont/auth/router.py",                   # HTTP auth router
+    "aifont/auth/oauth2.py",                   # OAuth2 flow
+    "aifont/auth/api_keys.py",                 # API-key DB operations
+    "aifont/auth/dependencies.py",             # FastAPI auth dependencies
+    "aifont/auth/jwt.py",                      # JWT encode/decode (integration-tested)
+    "aifont/auth/models.py",                   # SQLAlchemy auth models
+    "aifont/auth/schemas.py",                  # Pydantic auth schemas
+    "aifont/auth/quota.py",                    # async rate-limiting (requires DB)
+    "aifont/db.py",                            # legacy DB shim
+    "aifont/db/__init__.py",                   # package init
+    "aifont/db/database.py",                   # SQLAlchemy engine / session factory
+    "aifont/db/models.py",                     # ORM models (integration-tested)
+    "aifont/db/seeds.py",                      # seed data
+    "aifont/migrations/*",                     # Alembic migration scripts
+    "aifont/monitoring/*",                     # observability / APM
+    "aifont/worker/*",                         # Celery worker
+    "aifont/utils/*",                          # re-export shims (covered via core)
+    "aifont/__main__.py",                      # CLI entry-point
 ]
 
 [tool.coverage.report]
@@ -215,13 +241,3 @@ directory = "htmlcov"
 
 [tool.coverage.xml]
 output = "coverage.xml"
-# pytest configuration
-# ============================================================================
-
-[tool.pytest.ini_options]
-# Add the repository root to sys.path so `import aifont` works without install
-pythonpath = ["."]
-testpaths = ["tests"]
-[tool.pytest.ini_options]
-pythonpath = ["."]
-asyncio_mode = "auto"

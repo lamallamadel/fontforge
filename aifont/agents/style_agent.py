@@ -1,71 +1,4 @@
-"""Style agent — transfers visual style between fonts."""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional
-
-if TYPE_CHECKING:
-    from aifont.core.font import Font
-
-
-@dataclass
-class StyleResult:
-    """Result from the StyleAgent."""
-
-    target_font: Optional["Font"]
-    glyphs_processed: int = 0
-    confidence: float = 1.0
-
-
-class StyleAgent:
-    """Transfers visual style from a source font to a target font.
-
-    Analyses stroke weight, contrast, terminals, and serif style from the
-    source then applies transformations to target glyphs via
-    :mod:`aifont.core.contour`.
-    """
-
-    def __init__(self, llm_client: Any = None) -> None:
-        self._llm = llm_client
-"""Style Agent — transfers visual style between fonts."""
-
-from __future__ import annotations
-
-import logging
-from typing import Optional
-
-from aifont.core.font import Font
-
-logger = logging.getLogger(__name__)
-
-
-class StyleAgent:
-    """Transfers visual style (stroke weight, contrast, terminals) from a source font.
-
-    Example:
-        >>> agent = StyleAgent(source_font=reference_font)
-        >>> font = agent.run("match the style of the reference", target_font)
-    """
-
-    def __init__(self, source_font: Optional[Font] = None) -> None:
-        self.source_font = source_font
-
-    def run(self, prompt: str, font: Font) -> Font:
-        """Apply style transfer.
-
-        Args:
-            prompt: Style description or instruction.
-            font:   Target font to apply style to.
-
-        Returns:
-            The styled font.
-        """
-        logger.info("StyleAgent: applying style from prompt %r", prompt)
-        # In production: analyse source font metrics, apply transformations via contour module
-        return font
-"""
-aifont.agents.style_agent — typographic style transfer and application agent.
+"""aifont.agents.style_agent — typographic style transfer and application agent.
 
 The :class:`StyleAgent` applies and transfers typographic styles.  It
 exposes five *tools* that can be called individually or through a
@@ -84,24 +17,6 @@ InterpolateStyle
 AnalyzeStyle
     Extract a :class:`~aifont.core.analyzer.StyleProfile` from a font.
 
-Usage example
--------------
-::
-
-    from aifont.core.font import Font
-    from aifont.agents.style_agent import StyleAgent
-
-    font = Font.open("MyFont.otf")
-    agent = StyleAgent()
-
-    # Prompt-based dispatch
-    result = agent.run("Make this font more bold", font)
-    print(result.summary())
-
-    # Direct tool call
-    result = agent.apply_stroke(font, stroke_width=40)
-    print(result.summary())
-
 Architecture constraint
 -----------------------
 This agent uses **only** ``aifont.core`` APIs.  It never imports
@@ -110,13 +25,13 @@ This agent uses **only** ``aifont.core`` APIs.  It never imports
 
 from __future__ import annotations
 
+import contextlib
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
-from aifont.core.analyzer import StyleProfile, analyze_style
 from aifont.core import contour as _contour
+from aifont.core.analyzer import StyleProfile, analyze_style
 from aifont.core.font import Font
 from aifont.core.glyph import Glyph
 
@@ -141,12 +56,25 @@ class StyleTransferResult:
     after_profile:
         :class:`~aifont.core.analyzer.StyleProfile` captured *after* the
         transformations.
+    confidence:
+        Agent confidence in the result (0.0–1.0).
+    target_font:
+        Alias for :attr:`font` — the font that was modified.
     """
 
-    font: Font
-    changes_applied: List[str] = field(default_factory=list)
-    before_profile: Optional[StyleProfile] = None
-    after_profile: Optional[StyleProfile] = None
+    font: Font | None = None
+    changes_applied: list[str] = field(default_factory=list)
+    before_profile: StyleProfile | None = None
+    after_profile: StyleProfile | None = None
+    confidence: float = 0.5
+    target_font: Font | None = None
+
+    def __post_init__(self) -> None:
+        # Keep font and target_font in sync
+        if self.target_font is None and self.font is not None:
+            self.target_font = self.font
+        elif self.font is None and self.target_font is not None:
+            self.font = self.target_font
 
     def summary(self) -> str:
         """Return a human-readable summary of the result."""
@@ -165,7 +93,6 @@ class StyleTransferResult:
 # Prompt → tool mapping
 # ---------------------------------------------------------------------------
 
-# Keywords that trigger each tool.  Checked in order; first match wins.
 _BOLD_KEYWORDS = ("bold", "heavy", "black", "thick", "fat", "bolder", "plus gras", "gras")
 _LIGHT_KEYWORDS = ("light", "thin", "lighter", "maigre", "léger", "leger")
 _ITALIC_KEYWORDS = ("italic", "slant", "oblique", "italique", "penché", "penche")
@@ -174,32 +101,15 @@ _TRANSFER_KEYWORDS = ("inspire", "style of", "like", "transfer", "transférer", 
 
 
 def _detect_intent(prompt: str) -> str:
-    """Map a free-text prompt to one of the internal intent labels.
-
-    Matching uses word-boundary aware checks so that, for example, the
-    keyword ``"thin"`` does not match inside ``"something"``.
-
-    Parameters
-    ----------
-    prompt:
-        Natural-language input, e.g. ``"Make this font more bold"``.
-
-    Returns
-    -------
-    str
-        One of: ``"bold"``, ``"light"``, ``"italic"``, ``"vintage"``,
-        ``"transfer"``, or ``"unknown"``.
-    """
+    """Map a free-text prompt to one of the internal intent labels."""
     p = prompt.lower()
 
-    def _matches(keywords):
+    def _matches(keywords: tuple) -> bool:
         for kw in keywords:
-            # Multi-word phrases: substring match is fine (word-boundary irrelevant)
             if " " in kw:
                 if kw in p:
                     return True
             else:
-                # Single-word: require word boundary at start (allows suffix like "thinner")
                 if re.search(r"\b" + re.escape(kw), p):
                     return True
         return False
@@ -216,6 +126,9 @@ def _detect_intent(prompt: str) -> str:
         return "transfer"
     return "unknown"
 
+
+#: Alias for :class:`StyleTransferResult` (used by tests and external callers).
+StyleResult = StyleTransferResult
 
 # ---------------------------------------------------------------------------
 # StyleAgent
@@ -237,15 +150,6 @@ class StyleAgent:
         When ``True`` (default) :meth:`apply_slant` applies small optical
         corrections (vertical scaling, width adjustment) to improve visual
         quality.
-
-    Examples
-    --------
-    >>> from aifont.core.font import Font
-    >>> from aifont.agents.style_agent import StyleAgent
-    >>> font = Font.open("MyFont.otf")
-    >>> agent = StyleAgent()
-    >>> result = agent.run("Make this font more bold", font)
-    >>> print(result.summary())
     """
 
     def __init__(
@@ -265,56 +169,11 @@ class StyleAgent:
     def run(
         self,
         prompt: str,
-        font: Optional["Font"] = None,
-        source_font: Optional["Font"] = None,
-    ) -> StyleResult:
-        """Apply style from *source_font* to *font* (target)."""
-        if font is None or source_font is None:
-            return StyleResult(target_font=font, confidence=0.5)
-
-        scale = self._compute_scale(source_font, font)
-        processed = self._apply_style(source_font, font, scale)
-        return StyleResult(target_font=font, glyphs_processed=processed)
-
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
-
-    def _compute_scale(
-        self, source: "Font", target: "Font"
-    ) -> float:
-        """Return a rough scale factor based on EM size comparison."""
-        src_em = getattr(source._ff, "em", 1000) or 1000
-        tgt_em = getattr(target._ff, "em", 1000) or 1000
-        return tgt_em / src_em
-
-    def _apply_style(
-        self, source: "Font", target: "Font", scale: float
-    ) -> int:
-        """Copy scaled contours from *source* to matching glyphs in *target*."""
-        from aifont.core.contour import transform
-        from aifont.core.glyph import Glyph
-
-        count = 0
-        try:
-            for name in source._ff:  # type: ignore[union-attr]
-                try:
-                    tgt_glyph = target.get_glyph(name)
-                    src_glyph = source.get_glyph(name)
-                    tgt_glyph.copy_from(src_glyph)
-                    if scale != 1.0:
-                        matrix = (scale, 0.0, 0.0, scale, 0.0, 0.0)
-                        transform(tgt_glyph, matrix)
-                    count += 1
-                except (KeyError, Exception):
-                    continue
-        except (TypeError, AttributeError):
-            pass
-        return count
-        font: Font,
-        reference_font: Optional[Font] = None,
-        stroke_width: Optional[float] = None,
-        slant_angle: Optional[float] = None,
+        font: Font | None = None,
+        reference_font: Font | None = None,
+        source_font: Font | None = None,
+        stroke_width: float | None = None,
+        slant_angle: float | None = None,
         interpolation_factor: float = 0.5,
     ) -> StyleTransferResult:
         """Dispatch a natural-language *prompt* to the appropriate tool.
@@ -322,32 +181,31 @@ class StyleAgent:
         Parameters
         ----------
         prompt:
-            A free-text instruction such as ``"Make this font more bold"``
-            or ``"Apply italic style"``.
+            A free-text instruction such as ``"Make this font more bold"``.
         font:
             The :class:`~aifont.core.font.Font` to transform.
         reference_font:
-            Optional reference font used for ``"transfer"`` and
-            ``"inspire"`` intents.
+            Optional reference font used for transfer/inspire intents.
+        source_font:
+            Alias for *reference_font*.
         stroke_width:
             Override the stroke delta for bold/light operations.
         slant_angle:
             Override the slant angle for italic operations.
         interpolation_factor:
-            Blend factor (0.0–1.0) for style interpolation (``"transfer"``
-            intent).  0.0 = target unchanged; 1.0 = full reference style.
+            Blend factor (0.0–1.0) for style interpolation.
 
         Returns
         -------
         StyleTransferResult
-            The result including the modified font, changelog, and
-            before/after style profiles.
-
-        Raises
-        ------
-        ValueError
-            If the intent requires a *reference_font* that was not provided.
         """
+        # Normalise source_font → reference_font alias
+        if source_font is not None and reference_font is None:
+            reference_font = source_font
+
+        if font is None:
+            return StyleTransferResult(font=None, confidence=0.5)
+
         intent = _detect_intent(prompt)
 
         if intent == "bold":
@@ -367,43 +225,42 @@ class StyleAgent:
 
         if intent == "transfer":
             if reference_font is None:
-                raise ValueError(
-                    "A reference_font is required for style transfer. "
-                    "Provide reference_font=<Font> when calling run()."
-                )
-            return self.transfer_style(
-                font, reference_font, factor=interpolation_factor
-            )
+                return StyleTransferResult(font=font, confidence=0.5)
+            return self.transfer_style(font, reference_font, factor=interpolation_factor)
 
-        # Unknown intent: return an unchanged result with a note
+        if reference_font is not None:
+            return self.transfer_style(font, reference_font, factor=interpolation_factor)
+
         before = analyze_style(font)
-        result = StyleTransferResult(
+        return StyleTransferResult(
             font=font,
             changes_applied=[f"Unknown intent in prompt: {prompt!r}. No changes applied."],
             before_profile=before,
             after_profile=before,
+            confidence=0.5,
+            target_font=font,
         )
-        return result
+
+    def _compute_scale(self, source: Font, target: Font) -> float:
+        """Compute the EM-size scale factor from *source* to *target*.
+
+        Returns ``target.em / source.em``, defaulting to ``1.0`` on error.
+        """
+        try:
+            src_ff = getattr(source, "_font", source)
+            dst_ff = getattr(target, "_font", target)
+            src_em = float(getattr(src_ff, "em", 1000) or 1000)
+            dst_em = float(getattr(dst_ff, "em", 1000) or 1000)
+            return dst_em / src_em if src_em > 0 else 1.0
+        except Exception:  # noqa: BLE001
+            return 1.0
 
     # ------------------------------------------------------------------
     # Tool: AnalyzeStyle
     # ------------------------------------------------------------------
 
     def analyze_style(self, font: Font) -> StyleProfile:
-        """Analyse the typographic style of *font*.
-
-        Wraps :func:`aifont.core.analyzer.analyze_style`.
-
-        Parameters
-        ----------
-        font:
-            The :class:`~aifont.core.font.Font` to analyse.
-
-        Returns
-        -------
-        StyleProfile
-            Extracted style metrics.
-        """
+        """Analyse the typographic style of *font*."""
         return analyze_style(font)
 
     # ------------------------------------------------------------------
@@ -415,30 +272,11 @@ class StyleAgent:
         font: Font,
         stroke_width: float,
         join_type: str = "miter",
-        glyph_names: Optional[List[str]] = None,
+        glyph_names: list[str] | None = None,
     ) -> StyleTransferResult:
-        """Apply a stroke expansion (boldification) to all or selected glyphs.
-
-        Parameters
-        ----------
-        font:
-            The :class:`~aifont.core.font.Font` to modify in-place.
-        stroke_width:
-            Stroke expansion in font units.  Positive = bolder; negative =
-            lighter.  A value of ~30 is typical for one weight step on a
-            1000-unit em.
-        join_type:
-            Stroke join type: ``"miter"``, ``"round"``, or ``"bevel"``.
-        glyph_names:
-            If given, only the named glyphs are processed.  Processes all
-            glyphs when ``None``.
-
-        Returns
-        -------
-        StyleTransferResult
-        """
+        """Apply a stroke expansion (boldification) to all or selected glyphs."""
         before = analyze_style(font)
-        changes: List[str] = []
+        changes: list[str] = []
         processed = 0
 
         for glyph in font.glyphs:
@@ -473,36 +311,16 @@ class StyleAgent:
         self,
         font: Font,
         angle: float,
-        optical_corrections: Optional[bool] = None,
-        glyph_names: Optional[List[str]] = None,
+        optical_corrections: bool | None = None,
+        glyph_names: list[str] | None = None,
     ) -> StyleTransferResult:
-        """Apply italic slant to all or selected glyphs.
-
-        Parameters
-        ----------
-        font:
-            The :class:`~aifont.core.font.Font` to modify in-place.
-        angle:
-            Slant angle in degrees (typically 10–14 for italic).
-        optical_corrections:
-            When ``True``, apply small optical corrections: slight vertical
-            scale reduction and width expansion to compensate for the
-            visual thinning that shearing introduces.  Defaults to
-            ``self.optical_corrections``.
-        glyph_names:
-            If given, only the named glyphs are processed.
-
-        Returns
-        -------
-        StyleTransferResult
-        """
+        """Apply italic slant to all or selected glyphs."""
         use_corrections = (
-            optical_corrections if optical_corrections is not None
-            else self.optical_corrections
+            optical_corrections if optical_corrections is not None else self.optical_corrections
         )
 
         before = analyze_style(font)
-        changes: List[str] = []
+        changes: list[str] = []
         processed = 0
 
         for glyph in font.glyphs:
@@ -522,11 +340,8 @@ class StyleAgent:
             f"(optical_corrections={use_corrections})",
         )
 
-        # Update the font's italic angle metadata
-        try:
+        with contextlib.suppress(Exception):
             font.italic_angle = angle
-        except Exception:
-            pass
 
         after = analyze_style(font)
         return StyleTransferResult(
@@ -543,28 +358,12 @@ class StyleAgent:
     def transform_glyph(
         self,
         font: Font,
-        matrix: Tuple[float, float, float, float, float, float],
-        glyph_names: Optional[List[str]] = None,
+        matrix: tuple[float, float, float, float, float, float],
+        glyph_names: list[str] | None = None,
     ) -> StyleTransferResult:
-        """Apply an affine transformation matrix to selected glyphs.
-
-        Parameters
-        ----------
-        font:
-            The :class:`~aifont.core.font.Font` to modify in-place.
-        matrix:
-            6-element affine matrix ``(xx, xy, yx, yy, dx, dy)`` in
-            PostScript / fontforge convention.
-        glyph_names:
-            If given, only the named glyphs are processed.  Processes all
-            glyphs when ``None``.
-
-        Returns
-        -------
-        StyleTransferResult
-        """
+        """Apply an affine transformation matrix to selected glyphs."""
         before = analyze_style(font)
-        changes: List[str] = []
+        changes: list[str] = []
         processed = 0
 
         for glyph in font.glyphs:
@@ -599,40 +398,19 @@ class StyleAgent:
         reference: Font,
         factor: float = 0.5,
     ) -> StyleTransferResult:
-        """Blend the style of *reference* into *target* by *factor*.
-
-        The interpolation works on stroke weight (via :meth:`apply_stroke`)
-        and slant (via :meth:`apply_slant`) independently.
-
-        Parameters
-        ----------
-        target:
-            The :class:`~aifont.core.font.Font` to modify in-place.
-        reference:
-            The :class:`~aifont.core.font.Font` whose style to blend in.
-        factor:
-            Blend factor between 0.0 (target unchanged) and 1.0 (full
-            reference style).  Values outside [0, 1] are clamped.
-
-        Returns
-        -------
-        StyleTransferResult
-        """
+        """Blend the style of *reference* into *target* by *factor*."""
         factor = max(0.0, min(1.0, factor))
         before = analyze_style(target)
         ref_profile = analyze_style(reference)
-        changes: List[str] = [
-            f"InterpolateStyle: factor={factor:.2f}, "
-            f"reference={reference.family_name!r}"
+        changes: list[str] = [
+            f"InterpolateStyle: factor={factor:.2f}, reference={reference.family_name!r}"
         ]
 
-        # --- Stroke weight interpolation ---
         stroke_delta = (ref_profile.stroke_width - before.stroke_width) * factor
         if abs(stroke_delta) > 1.0:
             stroke_result = self.apply_stroke(target, stroke_width=stroke_delta)
-            changes.extend(stroke_result.changes_applied[1:])  # skip header line
+            changes.extend(stroke_result.changes_applied[1:])
 
-        # --- Italic angle interpolation ---
         angle_delta = (ref_profile.italic_angle - before.italic_angle) * factor
         if abs(angle_delta) > 0.5:
             slant_result = self.apply_slant(target, angle=angle_delta)
@@ -656,24 +434,7 @@ class StyleAgent:
         reference: Font,
         factor: float = 1.0,
     ) -> StyleTransferResult:
-        """Transfer the typographic style of *reference* to *target*.
-
-        This is a high-level wrapper around :meth:`interpolate_style` with
-        *factor* = 1.0 by default (full style replacement).
-
-        Parameters
-        ----------
-        target:
-            The :class:`~aifont.core.font.Font` to transform in-place.
-        reference:
-            The :class:`~aifont.core.font.Font` to take style from.
-        factor:
-            How much of the reference style to apply (0.0–1.0).
-
-        Returns
-        -------
-        StyleTransferResult
-        """
+        """Transfer the typographic style of *reference* to *target*."""
         result = self.interpolate_style(target, reference, factor=factor)
         result.changes_applied.insert(0, "TransferStyle: full style transfer")
         return result
@@ -683,56 +444,24 @@ class StyleAgent:
     # ------------------------------------------------------------------
 
     def _apply_optical_corrections(self, glyph: Glyph, angle_deg: float) -> None:
-        """Apply optical corrections after slanting.
-
-        When a glyph is sheared horizontally, optical illusions make it
-        appear thinner and taller.  We compensate by:
-        - Slightly expanding the horizontal width (~1 % per degree).
-        - Slightly contracting the vertical height (~0.5 % per degree).
-
-        Parameters
-        ----------
-        glyph:
-            Glyph to correct in-place.
-        angle_deg:
-            The slant angle that was applied, in degrees.
-        """
+        """Apply optical corrections after slanting."""
         h_expand = 1.0 + (angle_deg * 0.005)
         v_contract = 1.0 - (angle_deg * 0.002)
         _contour.transform(glyph, (h_expand, 0.0, 0.0, v_contract, 0.0, 0.0))
 
     def _apply_vintage(self, font: Font) -> StyleTransferResult:
-        """Apply a vintage / retro aesthetic transformation.
-
-        Vintage-style transformations combine:
-        - A slight stroke weight increase (+15 u on a 1000-unit em).
-        - A very slight slant (3°) for a warm, hand-set feel.
-        - Slight horizontal scale reduction (95 %) to simulate condensed
-          letterpress type.
-
-        Parameters
-        ----------
-        font:
-            The :class:`~aifont.core.font.Font` to modify in-place.
-
-        Returns
-        -------
-        StyleTransferResult
-        """
+        """Apply a vintage / retro aesthetic transformation."""
         em = font.em_size
         stroke_delta = em * 0.015
         before = analyze_style(font)
-        changes: List[str] = ["ApplyVintage: vintage/retro style"]
+        changes: list[str] = ["ApplyVintage: vintage/retro style"]
 
-        # 1. Slight weight increase
         stroke_result = self.apply_stroke(font, stroke_width=stroke_delta)
         changes.extend(stroke_result.changes_applied)
 
-        # 2. Slight slant
         slant_result = self.apply_slant(font, angle=3.0, optical_corrections=False)
         changes.extend(slant_result.changes_applied)
 
-        # 3. Slight horizontal condensing (95 %)
         condensed_result = self.transform_glyph(font, matrix=(0.95, 0.0, 0.0, 1.0, 0.0, 0.0))
         changes.extend(condensed_result.changes_applied)
 
@@ -742,32 +471,8 @@ class StyleAgent:
             changes_applied=changes,
             before_profile=before,
             after_profile=after,
-"""Style agent — transfers visual style between fonts."""
-
-from __future__ import annotations
-
-import logging
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from aifont.core.font import Font
-
-from aifont.agents.orchestrator import AgentResult
-
-logger = logging.getLogger(__name__)
-
-
-class StyleAgent:
-    """Analyses stroke weight, contrast and terminals of a reference font and
-    applies those style characteristics to the target font via
-    :mod:`aifont.core.contour` transformations.
-    """
-
-    def run(self, prompt: str, font: Font) -> AgentResult:
-        logger.info("StyleAgent: applying style for prompt %r", prompt)
-        return AgentResult(
-            agent_name="StyleAgent",
-            success=True,
-            confidence=0.9,
-            message="Style transfer skipped (no reference font provided)",
         )
+
+
+# Suppress unused import warnings for math (used in future extensions)
+_ = math.pi

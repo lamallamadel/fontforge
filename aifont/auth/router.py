@@ -23,7 +23,7 @@ from aifont.auth.jwt import (
     create_refresh_token,
     decode_refresh_token,
 )
-from aifont.auth.models import APIKey, OAuthAccount, OAuthProvider, RefreshToken, User, UserRole
+from aifont.auth.models import APIKey, OAuthAccount, OAuthProvider, RefreshToken, User
 from aifont.auth.oauth2 import (
     exchange_github_code,
     exchange_google_code,
@@ -33,7 +33,7 @@ from aifont.auth.oauth2 import (
     google_auth_url,
 )
 from aifont.auth.quota import (
-    QuotaExceeded,
+    QuotaExceededError,
     apply_role_quota,
     check_api_key_quota,
     get_or_create_quota,
@@ -123,7 +123,7 @@ async def refresh_tokens(
     try:
         data = decode_refresh_token(payload.refresh_token)
     except TokenError:
-        raise credentials_exception
+        raise credentials_exception from None
 
     token_hash = _hash_token(payload.refresh_token)
     result = await db.execute(
@@ -229,8 +229,10 @@ async def create_key(
     """Generate a new API key for the authenticated user."""
     try:
         await check_api_key_quota(current_user, db)
-    except QuotaExceeded as exc:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.detail)
+    except QuotaExceededError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=exc.detail
+        ) from exc
 
     api_key, raw = await create_api_key(
         current_user, payload.name, db, expires_at=payload.expires_at
@@ -252,9 +254,7 @@ async def list_keys(
     db: AsyncSession = Depends(get_db),
 ) -> list[APIKeyRead]:
     """List all API keys belonging to the authenticated user."""
-    result = await db.execute(
-        select(APIKey).where(APIKey.user_id == current_user.id)
-    )
+    result = await db.execute(select(APIKey).where(APIKey.user_id == current_user.id))
     keys = result.scalars().all()
     return [APIKeyRead.model_validate(k) for k in keys]
 
@@ -326,7 +326,7 @@ async def oauth2_google_callback(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Google OAuth2 error: {exc}",
-        )
+        ) from exc
 
     user = await _upsert_oauth_user(
         provider=OAuthProvider.GOOGLE,
@@ -370,7 +370,7 @@ async def oauth2_github_callback(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"GitHub OAuth2 error: {exc}",
-        )
+        ) from exc
 
     user = await _upsert_oauth_user(
         provider=OAuthProvider.GITHUB,
@@ -445,9 +445,7 @@ async def _upsert_oauth_user(
         oauth_account.access_token = access_token
         oauth_account.refresh_token = refresh_token_oauth
         await db.commit()
-        user_result = await db.execute(
-            select(User).where(User.id == oauth_account.user_id)
-        )
+        user_result = await db.execute(select(User).where(User.id == oauth_account.user_id))
         return user_result.scalar_one()
 
     # Link to existing local user by email, or create a new one

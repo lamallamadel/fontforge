@@ -32,11 +32,9 @@ Typical workflow::
 
 from __future__ import annotations
 
-import os
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 try:
     from fontTools.designspaceLib import (
@@ -46,14 +44,16 @@ try:
         SourceDescriptor,
     )
     from fontTools.varLib import build as _varlib_build
+
     _FONTTOOLS_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _FONTTOOLS_AVAILABLE = False
 
 try:
-    import fontforge as _fontforge
-    _FF_AVAILABLE = True
-except ImportError:  # pragma: no cover
+    import importlib.util
+
+    _FF_AVAILABLE = importlib.util.find_spec("fontforge") is not None
+except Exception:  # pragma: no cover
     _FF_AVAILABLE = False
 
 
@@ -61,7 +61,7 @@ except ImportError:  # pragma: no cover
 # Standard OpenType variation axis tags
 # ---------------------------------------------------------------------------
 
-STANDARD_AXES: Dict[str, str] = {
+STANDARD_AXES: dict[str, str] = {
     "wght": "Weight",
     "wdth": "Width",
     "ital": "Italic",
@@ -70,8 +70,8 @@ STANDARD_AXES: Dict[str, str] = {
 }
 
 # Recommended default ranges for standard axes
-AXIS_RANGES: Dict[str, Tuple[float, float, float]] = {
-    "wght": (100.0, 400.0, 900.0),   # (minimum, default, maximum)
+AXIS_RANGES: dict[str, tuple[float, float, float]] = {
+    "wght": (100.0, 400.0, 900.0),  # (minimum, default, maximum)
     "wdth": (50.0, 100.0, 200.0),
     "ital": (0.0, 0.0, 1.0),
     "opsz": (6.0, 12.0, 144.0),
@@ -114,7 +114,7 @@ class VariationAxis:
             )
 
     @classmethod
-    def from_tag(cls, tag: str, **overrides: float) -> "VariationAxis":
+    def from_tag(cls, tag: str, **overrides: float) -> VariationAxis:
         """Construct a :class:`VariationAxis` from a standard OpenType tag.
 
         Sensible defaults are applied for well-known tags (``wght``, ``wdth``,
@@ -166,10 +166,10 @@ class NamedInstance:
     """
 
     name: str
-    location: Dict[str, float]
-    family_name: Optional[str] = None
-    style_name: Optional[str] = None
-    postscript_name: Optional[str] = None
+    location: dict[str, float]
+    family_name: str | None = None
+    style_name: str | None = None
+    postscript_name: str | None = None
 
     def __post_init__(self) -> None:
         if self.style_name is None:
@@ -195,10 +195,10 @@ class Master:
 
     name: str
     path: str | Path
-    location: Dict[str, float]
+    location: dict[str, float]
     is_default: bool = False
-    family_name: Optional[str] = None
-    style_name: Optional[str] = None
+    family_name: str | None = None
+    style_name: str | None = None
 
     def __post_init__(self) -> None:
         self.path = Path(self.path)
@@ -233,9 +233,9 @@ def interpolate(
 
 
 def location_to_normalized(
-    location: Dict[str, float],
-    axes: List[VariationAxis],
-) -> Dict[str, float]:
+    location: dict[str, float],
+    axes: list[VariationAxis],
+) -> dict[str, float]:
     """Normalise a design-space location to ``[−1, 0, +1]`` per axis.
 
     The normalised value is computed piecewise:
@@ -253,7 +253,7 @@ def location_to_normalized(
         Mapping of axis tag → normalised value.
     """
     axis_map = {ax.tag: ax for ax in axes}
-    normalised: Dict[str, float] = {}
+    normalised: dict[str, float] = {}
     for tag, value in location.items():
         ax = axis_map.get(tag)
         if ax is None:
@@ -273,11 +273,11 @@ def location_to_normalized(
 
 
 def _build_design_space(
-    axes: List[VariationAxis],
-    masters: List[Master],
-    instances: List[NamedInstance],
+    axes: list[VariationAxis],
+    masters: list[Master],
+    instances: list[NamedInstance],
     family_name: str = "MyVariableFont",
-) -> "DesignSpaceDocument":
+) -> DesignSpaceDocument:
     """Build a :class:`fontTools.designspaceLib.DesignSpaceDocument`.
 
     Args:
@@ -345,10 +345,10 @@ def _build_design_space(
 
 
 def preview_interpolation(
-    axes: List[VariationAxis],
-    masters: List[Master],
-    target_location: Dict[str, float],
-) -> Dict[str, float]:
+    axes: list[VariationAxis],
+    masters: list[Master],
+    target_location: dict[str, float],
+) -> dict[str, float]:
     """Return a preview of where a target location sits relative to each axis.
 
     This is a lightweight utility that does *not* require font data — it only
@@ -369,7 +369,7 @@ def preview_interpolation(
         values.
     """
     axis_map = {ax.tag: ax for ax in axes}
-    result: Dict[str, dict] = {}
+    result: dict[str, dict] = {}
 
     for tag, value in target_location.items():
         ax = axis_map.get(tag)
@@ -412,10 +412,10 @@ def preview_interpolation(
 
 
 def check_opentype_conformance(
-    axes: List[VariationAxis],
-    masters: List[Master],
-    instances: List[NamedInstance],
-) -> List[str]:
+    axes: list[VariationAxis],
+    masters: list[Master],
+    instances: list[NamedInstance],
+) -> list[str]:
     """Run a series of OpenType conformance checks on the variable font setup.
 
     Returns a list of warning/error messages.  An empty list means all checks
@@ -439,7 +439,7 @@ def check_opentype_conformance(
     Returns:
         List of error/warning strings.  Empty list = no issues found.
     """
-    issues: List[str] = []
+    issues: list[str] = []
     axis_tags = {ax.tag for ax in axes}
     axis_map = {ax.tag: ax for ax in axes}
 
@@ -489,7 +489,7 @@ def check_opentype_conformance(
                 )
 
     # Check 7 — no duplicate master locations
-    seen_locations: List[Dict[str, float]] = []
+    seen_locations: list[dict[str, float]] = []
     for master in masters:
         loc = {k: master.location.get(k, 0.0) for k in axis_tags}
         if loc in seen_locations:
@@ -537,15 +537,15 @@ class VariableFontBuilder:
             family_name: Font family name embedded in the generated variable font.
         """
         self.family_name = family_name
-        self._axes: List[VariationAxis] = []
-        self._masters: List[Master] = []
-        self._instances: List[NamedInstance] = []
+        self._axes: list[VariationAxis] = []
+        self._masters: list[Master] = []
+        self._instances: list[NamedInstance] = []
 
     # ------------------------------------------------------------------
     # Axis management
     # ------------------------------------------------------------------
 
-    def add_axis(self, axis: VariationAxis) -> "VariableFontBuilder":
+    def add_axis(self, axis: VariationAxis) -> VariableFontBuilder:
         """Add a variation axis.
 
         Args:
@@ -563,7 +563,7 @@ class VariableFontBuilder:
         self._axes.append(axis)
         return self
 
-    def remove_axis(self, tag: str) -> "VariableFontBuilder":
+    def remove_axis(self, tag: str) -> VariableFontBuilder:
         """Remove a variation axis by tag.
 
         Args:
@@ -582,7 +582,7 @@ class VariableFontBuilder:
         return self
 
     @property
-    def axes(self) -> List[VariationAxis]:
+    def axes(self) -> list[VariationAxis]:
         """List of currently defined variation axes (read-only copy)."""
         return list(self._axes)
 
@@ -590,7 +590,7 @@ class VariableFontBuilder:
     # Master management
     # ------------------------------------------------------------------
 
-    def add_master(self, master: Master) -> "VariableFontBuilder":
+    def add_master(self, master: Master) -> VariableFontBuilder:
         """Add a font master.
 
         Args:
@@ -602,7 +602,7 @@ class VariableFontBuilder:
         self._masters.append(master)
         return self
 
-    def remove_master(self, name: str) -> "VariableFontBuilder":
+    def remove_master(self, name: str) -> VariableFontBuilder:
         """Remove a master by name.
 
         Args:
@@ -621,7 +621,7 @@ class VariableFontBuilder:
         return self
 
     @property
-    def masters(self) -> List[Master]:
+    def masters(self) -> list[Master]:
         """List of currently defined masters (read-only copy)."""
         return list(self._masters)
 
@@ -629,7 +629,7 @@ class VariableFontBuilder:
     # Instance management
     # ------------------------------------------------------------------
 
-    def add_instance(self, instance: NamedInstance) -> "VariableFontBuilder":
+    def add_instance(self, instance: NamedInstance) -> VariableFontBuilder:
         """Add a named instance.
 
         Args:
@@ -641,7 +641,7 @@ class VariableFontBuilder:
         self._instances.append(instance)
         return self
 
-    def remove_instance(self, name: str) -> "VariableFontBuilder":
+    def remove_instance(self, name: str) -> VariableFontBuilder:
         """Remove a named instance by name.
 
         Args:
@@ -660,7 +660,7 @@ class VariableFontBuilder:
         return self
 
     @property
-    def instances(self) -> List[NamedInstance]:
+    def instances(self) -> list[NamedInstance]:
         """List of currently defined named instances (read-only copy)."""
         return list(self._instances)
 
@@ -668,7 +668,7 @@ class VariableFontBuilder:
     # Validation
     # ------------------------------------------------------------------
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Run OpenType conformance checks.
 
         Returns:
@@ -680,7 +680,7 @@ class VariableFontBuilder:
     # Design-space export
     # ------------------------------------------------------------------
 
-    def build_design_space(self) -> "DesignSpaceDocument":
+    def build_design_space(self) -> DesignSpaceDocument:
         """Build and return the :class:`~fontTools.designspaceLib.DesignSpaceDocument`.
 
         Returns:
@@ -689,9 +689,7 @@ class VariableFontBuilder:
         Raises:
             ImportError: If fontTools is not installed.
         """
-        return _build_design_space(
-            self._axes, self._masters, self._instances, self.family_name
-        )
+        return _build_design_space(self._axes, self._masters, self._instances, self.family_name)
 
     def save_design_space(self, path: str | Path) -> Path:
         """Write the design space to a ``.designspace`` file.
@@ -764,9 +762,7 @@ class VariableFontBuilder:
                 vf, _, _ = _varlib_build(str(ds_path))
                 vf.save(str(output))
             except Exception as exc:  # pragma: no cover
-                raise RuntimeError(
-                    f"varLib build failed: {exc}"
-                ) from exc
+                raise RuntimeError(f"varLib build failed: {exc}") from exc
 
         return output
 
@@ -774,7 +770,7 @@ class VariableFontBuilder:
     # Preview / interpolation utilities
     # ------------------------------------------------------------------
 
-    def preview_location(self, location: Dict[str, float]) -> Dict[str, dict]:
+    def preview_location(self, location: dict[str, float]) -> dict[str, dict]:
         """Preview interpolation at a given design-space location.
 
         Returns information about where the location sits relative to each

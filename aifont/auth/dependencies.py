@@ -64,7 +64,7 @@ async def get_current_user(
         # --- API key fallback ---
         user = await _resolve_api_key(raw_token, db)
         if user is None:
-            raise credentials_exception
+            raise credentials_exception from None
         return user
 
     user = await _get_user_by_id(user_id, db)
