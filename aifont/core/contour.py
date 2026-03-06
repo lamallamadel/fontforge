@@ -14,7 +14,12 @@ def simplify(glyph: "Glyph", threshold: float = 1.0) -> None:
     Args:
         glyph:     The glyph to simplify.
         threshold: Maximum distance for point removal (default 1.0).
+
+    Raises:
+        RuntimeError: If the glyph is not properly initialized.
     """
+    if glyph._ff is None:
+        raise RuntimeError("Glyph is not properly initialized.")
     glyph._ff.simplify(threshold, ("mergelines",))
 
 
@@ -23,7 +28,12 @@ def remove_overlap(glyph: "Glyph") -> None:
 
     Args:
         glyph: The glyph to process.
+
+    Raises:
+        RuntimeError: If the glyph is not properly initialized.
     """
+    if glyph._ff is None:
+        raise RuntimeError("Glyph is not properly initialized.")
     glyph._ff.removeOverlap()
 
 
@@ -41,6 +51,8 @@ def transform(glyph: "Glyph", matrix: Sequence[float]) -> None:
     """
     if len(matrix) != 6:
         raise ValueError("Matrix must have exactly 6 elements [xx, xy, yx, yy, dx, dy].")
+    if glyph._ff is None:
+        raise RuntimeError("Glyph is not properly initialized.")
     glyph._ff.transform(tuple(matrix))
 
 
@@ -49,5 +61,10 @@ def reverse_direction(glyph: "Glyph") -> None:
 
     Args:
         glyph: The glyph to process.
+
+    Raises:
+        RuntimeError: If the glyph is not properly initialized.
     """
+    if glyph._ff is None:
+        raise RuntimeError("Glyph is not properly initialized.")
     glyph._ff.reverseDirection()

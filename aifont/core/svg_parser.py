@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
+
+try:
+    import defusedxml.ElementTree as ET  # type: ignore
+except ImportError:
+    import xml.etree.ElementTree as ET  # type: ignore  # noqa: PLC0414
 
 if TYPE_CHECKING:
     from aifont.core.font import Font

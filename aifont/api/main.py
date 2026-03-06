@@ -18,9 +18,9 @@ from aifont.core.analyzer import analyze
 
 def _delete_after_send(path: Path):
     """Return a background task callable that deletes *path*."""
-    def _task():
+    def delete_file():
         path.unlink(missing_ok=True)
-    return _task
+    return delete_file
 
 app = FastAPI(
     title="AIFont API",
