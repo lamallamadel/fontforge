@@ -1,0 +1,15 @@
+pyproject.toml
+aifont.egg-info/PKG-INFO
+aifont.egg-info/SOURCES.txt
+aifont.egg-info/dependency_links.txt
+aifont.egg-info/entry_points.txt
+aifont.egg-info/requires.txt
+aifont.egg-info/top_level.txt
+tests/test_agents.py
+tests/test_aifont.py
+tests/test_analyzer.py
+tests/test_core_extra.py
+tests/test_db_integration.py
+tests/test_glyph.py
+tests/test_security.py
+tests/test_variable_svg.py
