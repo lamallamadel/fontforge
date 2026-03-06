@@ -1,0 +1,2 @@
+# Base dependencies shared by all Python services
+fonttools>=4.53.0
