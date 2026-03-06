@@ -198,17 +198,25 @@ def _parse_path_d(d: str) -> List[Tuple[str, List[float]]]:
                 a[0] += cx
                 a[1] += cy
             elif upper == "C":
-                a[0] += cx; a[1] += cy
-                a[2] += cx; a[3] += cy
-                a[4] += cx; a[5] += cy
+                a[0] += cx
+                a[1] += cy
+                a[2] += cx
+                a[3] += cy
+                a[4] += cx
+                a[5] += cy
             elif upper == "S":
-                a[0] += cx; a[1] += cy
-                a[2] += cx; a[3] += cy
+                a[0] += cx
+                a[1] += cy
+                a[2] += cx
+                a[3] += cy
             elif upper == "Q":
-                a[0] += cx; a[1] += cy
-                a[2] += cx; a[3] += cy
+                a[0] += cx
+                a[1] += cy
+                a[2] += cx
+                a[3] += cy
             elif upper == "A":
-                a[5] += cx; a[6] += cy
+                a[5] += cx
+                a[6] += cy
 
         commands.append((upper, a))
 
