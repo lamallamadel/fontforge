@@ -1,0 +1,196 @@
+# ---------------------------------------------------------------------------
+# Prometheus alert rules for the AIFont platform
+# ---------------------------------------------------------------------------
+
+groups:
+
+  # -------------------------------------------------------------------------
+  # API / HTTP
+  # -------------------------------------------------------------------------
+  - name: aifont_api
+    interval: 30s
+    rules:
+
+      # Service is completely down
+      - alert: AIFontAPIDown
+        expr: up{job="aifont-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "AIFont API is down"
+          description: >
+            The AIFont API scrape target {{ $labels.instance }} has been
+            unreachable for more than 1 minute.
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#aifont-api-down"
+
+      # High error rate (5xx)
+      - alert: AIFontHighErrorRate
+        expr: |
+          (
+            sum(rate(aifont_http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(aifont_http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "AIFont API error rate above 5 %"
+          description: >
+            The HTTP 5xx error rate is {{ printf "%.1f" (mul $value 100) }}%
+            over the last 5 minutes, which exceeds the 5% threshold.
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#high-error-rate"
+
+      - alert: AIFontCriticalErrorRate
+        expr: |
+          (
+            sum(rate(aifont_http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(aifont_http_requests_total[5m]))
+          ) > 0.20
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "AIFont API critical error rate above 20 %"
+          description: >
+            The HTTP 5xx error rate is {{ printf "%.1f" (mul $value 100) }}%,
+            well above the 20% critical threshold.
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#high-error-rate"
+
+      # High P99 latency
+      - alert: AIFontHighLatency
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(aifont_http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "AIFont API P99 latency above 2 s on {{ $labels.endpoint }}"
+          description: >
+            P99 request latency for {{ $labels.endpoint }} is
+            {{ printf "%.2f" $value }}s, exceeding the 2-second SLO.
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#high-latency"
+
+      - alert: AIFontCriticalLatency
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(aifont_http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 10.0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "AIFont API P99 latency above 10 s on {{ $labels.endpoint }}"
+          description: >
+            P99 request latency for {{ $labels.endpoint }} is
+            {{ printf "%.2f" $value }}s — the endpoint may be stalled.
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#high-latency"
+
+  # -------------------------------------------------------------------------
+  # Agent pipeline
+  # -------------------------------------------------------------------------
+  - name: aifont_agents
+    interval: 30s
+    rules:
+
+      # Agent error spike
+      - alert: AIFontAgentErrors
+        expr: |
+          sum(rate(aifont_agent_run_errors_total[5m])) by (agent_name) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "Agent {{ $labels.agent_name }} error rate is elevated"
+          description: >
+            Agent {{ $labels.agent_name }} is producing
+            {{ printf "%.2f" $value }} errors/second over the last 5 minutes.
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#agent-errors"
+
+      # Slow agent runs
+      - alert: AIFontAgentSlowRun
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(aifont_agent_run_duration_seconds_bucket[10m])) by (le, agent_name)
+          ) > 60
+        for: 10m
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "Agent {{ $labels.agent_name }} P95 run time above 60 s"
+          description: >
+            P95 run time for {{ $labels.agent_name }} is
+            {{ printf "%.1f" $value }}s.
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#slow-agent"
+
+  # -------------------------------------------------------------------------
+  # Resource utilisation
+  # -------------------------------------------------------------------------
+  - name: aifont_resources
+    interval: 60s
+    rules:
+
+      # High CPU usage on host
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: >
+            CPU usage on {{ $labels.instance }} has been above 85%
+            for 10 minutes (current: {{ printf "%.1f" $value }}%).
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#high-cpu"
+
+      # Low available memory
+      - alert: LowMemoryAvailable
+        expr: |
+          (
+            node_memory_MemAvailable_bytes
+            / node_memory_MemTotal_bytes
+          ) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Low memory on {{ $labels.instance }}"
+          description: >
+            Available memory on {{ $labels.instance }} is below 10%
+            ({{ printf "%.1f" $value }}% free).
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#low-memory"
+
+      # Disk running full
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+            / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}
+          ) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Disk space low on {{ $labels.instance }}"
+          description: >
+            Disk on {{ $labels.instance }} (/) has less than 15% free
+            ({{ printf "%.1f" $value }}% remaining).
+          runbook_url: "https://github.com/lamallamadel/fontforge/blob/master/docs/runbook.md#disk-space-low"
