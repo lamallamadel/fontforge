@@ -1,5 +1,4 @@
-"""
-aifont.core.font — high-level Font wrapper around ``fontforge.open()``.
+"""aifont.core.font — high-level Font wrapper around ``fontforge.font``.
 
 Responsibilities:
 - Open and save font files.
@@ -13,14 +12,186 @@ FontForge source code is never modified.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Generator, Iterator, List, Optional
+from typing import Dict, Iterator, List, Optional, Union
 
 try:
     import fontforge  # type: ignore
     if not hasattr(fontforge, "font"):
-        fontforge = None  # type: ignore  # namespace package stub, not the real extension
+        fontforge = None  # type: ignore
 except ImportError:  # pragma: no cover
     fontforge = None  # type: ignore
+
+# Module-level references used by Font.open() / Font.new() and patchable in tests
+_ff = fontforge
+_FF_AVAILABLE: bool = fontforge is not None
+
+from aifont.core.glyph import Glyph
+
+# ---------------------------------------------------------------------------
+# Metadata fields accepted by set_metadata() — fontforge attribute names
+# ---------------------------------------------------------------------------
+_METADATA_FIELDS = frozenset({
+    "fontname", "familyname", "fullname", "version", "copyright",
+    "em", "ascent", "descent", "italicangle", "weight",
+})
+
+
+class FontMetadata:
+    """Dict-like and attribute-based view of a font's metadata.
+
+    Supports both fontforge-style key access (``metadata["fontname"]``)
+    and Pythonic attribute access (``metadata.family_name``).
+    """
+
+    def __init__(self, ff_font: object) -> None:
+        object.__setattr__(self, "_ff", ff_font)
+
+    # ------------------------------------------------------------------
+    # Dict-like interface (fontforge attribute names as keys)
+    # ------------------------------------------------------------------
+
+    def __contains__(self, key: object) -> bool:
+        return key in _METADATA_FIELDS
+
+    def __getitem__(self, key: str) -> object:
+        if key not in _METADATA_FIELDS:
+            raise KeyError(key)
+        ff = object.__getattribute__(self, "_ff")
+        return getattr(ff, key, None)
+
+    def __setitem__(self, key: str, value: object) -> None:
+        if key not in _METADATA_FIELDS:
+            raise KeyError(key)
+        ff = object.__getattribute__(self, "_ff")
+        setattr(ff, key, value)
+
+    # ------------------------------------------------------------------
+    # Pythonic attribute access
+    # ------------------------------------------------------------------
+
+    @property
+    def family_name(self) -> str:
+        ff = object.__getattribute__(self, "_ff")
+        return str(getattr(ff, "familyname", "") or "")
+
+    @family_name.setter
+    def family_name(self, value: str) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.familyname = value  # type: ignore[union-attr]
+
+    @property
+    def full_name(self) -> str:
+        ff = object.__getattribute__(self, "_ff")
+        return str(getattr(ff, "fullname", "") or "")
+
+    @full_name.setter
+    def full_name(self, value: str) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.fullname = value  # type: ignore[union-attr]
+
+    @property
+    def name(self) -> str:
+        """PostScript font name (``fontname``). Alias for :attr:`font_name`."""
+        ff = object.__getattribute__(self, "_ff")
+        return str(getattr(ff, "fontname", "") or "")
+
+    @name.setter
+    def name(self, value: str) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.fontname = value  # type: ignore[union-attr]
+
+    @property
+    def family(self) -> str:
+        """Font family name (``familyname``). Alias for :attr:`family_name`."""
+        ff = object.__getattribute__(self, "_ff")
+        return str(getattr(ff, "familyname", "") or "")
+
+    @family.setter
+    def family(self, value: str) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.familyname = value  # type: ignore[union-attr]
+
+    @property
+    def font_name(self) -> str:
+        """Alias for :attr:`name`."""
+        return self.name
+
+    @property
+    def version(self) -> str:
+        ff = object.__getattribute__(self, "_ff")
+        return str(getattr(ff, "version", "") or "")
+
+    @version.setter
+    def version(self, value: str) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.version = value  # type: ignore[union-attr]
+
+    @property
+    def copyright(self) -> str:
+        ff = object.__getattribute__(self, "_ff")
+        return str(getattr(ff, "copyright", "") or "")
+
+    @copyright.setter
+    def copyright(self, value: str) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.copyright = value  # type: ignore[union-attr]
+
+    @property
+    def weight(self) -> str:
+        ff = object.__getattribute__(self, "_ff")
+        return str(getattr(ff, "weight", "") or "")
+
+    @weight.setter
+    def weight(self, value: str) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.weight = value  # type: ignore[union-attr]
+
+    @property
+    def em_size(self) -> int:
+        ff = object.__getattribute__(self, "_ff")
+        return int(getattr(ff, "em", 1000))
+
+    @em_size.setter
+    def em_size(self, value: int) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.em = int(value)  # type: ignore[union-attr]
+
+    @property
+    def ascent(self) -> int:
+        ff = object.__getattribute__(self, "_ff")
+        return int(getattr(ff, "ascent", 800))
+
+    @ascent.setter
+    def ascent(self, value: int) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.ascent = int(value)  # type: ignore[union-attr]
+
+    @property
+    def descent(self) -> int:
+        ff = object.__getattribute__(self, "_ff")
+        return int(getattr(ff, "descent", 200))
+
+    @descent.setter
+    def descent(self, value: int) -> None:
+        ff = object.__getattribute__(self, "_ff")
+        ff.descent = int(value)  # type: ignore[union-attr]
+
+    def to_dict(self) -> dict:
+        """Return a plain dict snapshot of the metadata."""
+        return {
+            "name": self.name,
+            "family": self.family,
+            "weight": self.weight,
+            "version": self.version,
+            "copyright": self.copyright,
+            "em_size": self.em_size,
+        }
+
+    def __repr__(self) -> str:
+        return (
+            f"FontMetadata(name={self.name!r}, family={self.family!r}, "
+            f"weight={self.weight!r})"
+        )
 
 
 class Font:
@@ -31,7 +202,7 @@ class Font:
         font = Font.open("MyFont.otf")
         for glyph in font.glyphs:
             print(glyph.name)
-        font.save("MyFont_modified.otf")
+        font.save("MyFont_modified.sfd")
     """
 
     def __init__(self, _ff_font: object) -> None:
@@ -43,593 +214,112 @@ class Font:
         self._font = _ff_font
 
     # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def _ff(self) -> object:
+        """Return the underlying fontforge font object."""
+        return self._font
+
+    @property
+    def raw(self) -> object:
+        """The underlying ``fontforge.font`` object."""
+        return self._font
+
+    @property
+    def ff_font(self) -> object:
+        """Alias for :attr:`raw`."""
+        return self._font
+
+    # ------------------------------------------------------------------
     # Constructors
     # ------------------------------------------------------------------
 
     @classmethod
-    def open(cls, path: str | Path) -> "Font":
-        """Open a font file and return a :class:`Font` instance.
-
-"""High-level Font wrapper around fontforge.font."""
-
-from __future__ import annotations
-
-import os
-from typing import TYPE_CHECKING, Dict, Iterator, List, Optional
-
-try:
-    import fontforge as _ff
-
-    _FF_AVAILABLE = hasattr(_ff, "font")
-except ImportError:
-    _ff = None  # type: ignore[assignment]
-    _FF_AVAILABLE = False
-
-if TYPE_CHECKING:
-    from aifont.core.glyph import Glyph
-
-
-class FontMetadata:
-    """Structured font metadata."""
-
-    def __init__(self, ff_font: object) -> None:
-        self._ff = ff_font
-
-    @property
-    def name(self) -> str:
-        return getattr(self._ff, "fontname", "")
-
-    @name.setter
-    def name(self, value: str) -> None:
-        self._ff.fontname = value  # type: ignore[union-attr]
-
-    @property
-    def family(self) -> str:
-        return getattr(self._ff, "familyname", "")
-
-    @family.setter
-    def family(self, value: str) -> None:
-        self._ff.familyname = value  # type: ignore[union-attr]
-
-    @property
-    def weight(self) -> str:
-        return getattr(self._ff, "weight", "Regular")
-
-    @weight.setter
-    def weight(self, value: str) -> None:
-        self._ff.weight = value  # type: ignore[union-attr]
-
-    @property
-    def version(self) -> str:
-        return getattr(self._ff, "version", "")
-
-    @version.setter
-    def version(self, value: str) -> None:
-        self._ff.version = value  # type: ignore[union-attr]
-
-    def to_dict(self) -> Dict[str, str]:
-        return {
-            "name": self.name,
-            "family": self.family,
-            "weight": self.weight,
-            "version": self.version,
-        }
-
-
-class Font:
-    """Pythonic wrapper around a fontforge.font object.
-
-    All low-level operations are delegated to the underlying fontforge
-    font object.  Never call fontforge directly — use this class.
-    """
-
-    def __init__(self, _ff_font: object) -> None:
-        self._ff = _ff_font
-        self._metadata = FontMetadata(_ff_font)
-
-    # ------------------------------------------------------------------
-    # Construction helpers
-    # ------------------------------------------------------------------
-
-    @classmethod
-    def open(cls, path: str) -> "Font":
-        """Open an existing font file and return a Font instance."""
-        if not _FF_AVAILABLE or _ff is None:
-            raise RuntimeError(
-                "fontforge Python bindings are not available. "
-                "Install fontforge to use Font.open()."
-            )
-        if not os.path.exists(path):
+    def open(cls, path: Union[str, Path]) -> "Font":
+        """Open an existing font file and return a :class:`Font` instance."""
+        p = Path(path)
+        if not p.exists():
             raise FileNotFoundError(f"Font file not found: {path}")
-        ff_font = _ff.open(path)  # type: ignore[union-attr]
-        return cls(ff_font)
+        import aifont.core.font as _self_mod
+        if not _self_mod._FF_AVAILABLE or _self_mod._ff is None:
+            raise RuntimeError("fontforge Python bindings are not available.")
+        return cls(_self_mod._ff.open(str(p)))  # type: ignore[union-attr]
 
     @classmethod
     def new(cls, name: str = "") -> "Font":
-        """Create a new empty font and return a Font instance."""
-        if not _FF_AVAILABLE or _ff is None:
-            raise RuntimeError(
-                "fontforge Python bindings are not available. "
-                "Install fontforge to use Font.new()."
-            )
-        ff_font = _ff.font()  # type: ignore[union-attr]
-        ff_font.fontname = name
-"""
-aifont.core.font — high-level Font wrapper around ``fontforge.open()``.
-
-Responsibilities
-----------------
-- Create new fonts and open existing ones (SFD, UFO, OTF, TTF, …).
-- Read and write font-level metadata (name, family, version, copyright).
-- Enumerate, add and remove glyphs.
-- Save the font back to disk in native SFD format.
-- Export the font to binary formats (OTF, TTF, WOFF, …).
-
-All heavy lifting is delegated to the underlying ``fontforge.font`` object.
-FontForge is treated as a black-box dependency: ``import fontforge`` is the
-only way this module communicates with it.
-"""aifont.core.font — high-level Font wrapper around fontforge.open().
-
-FontForge is the underlying engine.  DO NOT modify FontForge source code.
-This module wraps the ``fontforge.font`` object with a clean Pythonic API.
-"""
-aifont.core.font — High-level Font wrapper around FontForge.
-
-This module provides the :class:`Font` class, which wraps
-``fontforge.font`` objects and exposes a clean, Pythonic API for
-opening, inspecting, modifying and saving font files.
-
-FontForge is used as a black-box dependency via ``import fontforge``.
-No FontForge source code is modified.
-"""
-
-from __future__ import annotations
-
-from pathlib import Path
-from typing import List, Optional
-
-try:
-    import fontforge  # type: ignore[import]
-except ImportError:  # pragma: no cover – no FontForge available in CI
-    fontforge = None  # type: ignore[assignment]
-from typing import Optional
-
-try:
-    # Imported as `_fontforge` to avoid shadowing the public name and to make
-    # clear that this is an internal dependency, not part of the aifont API.
-    import fontforge as _fontforge
-except ImportError:  # pragma: no cover
-    _fontforge = None  # type: ignore[assignment]
-
-
-class Font:
-    """Pythonic wrapper around a :class:`fontforge.font` object.
-
-    Use :meth:`Font.open` to load an existing font file, or :meth:`Font.new`
-    to create a blank font.
-    """
-
-    def __init__(self, _ff_font: object) -> None:
-        """Initialise from an existing fontforge font object.
-
-        Args:
-            _ff_font: A raw ``fontforge.font`` instance.
-        """
-import os
-from typing import Dict, Iterable, Iterator, List, Optional
-
-import fontforge
-
-from .glyph import Glyph
-
-
-class FontMetadata:
-    """Structured container for font-level metadata.
-
-    Attributes
-    ----------
-    family_name : str
-        The font family name (e.g. ``"Roboto"``).
-    full_name : str
-        The full PostScript name (e.g. ``"Roboto Bold"``).
-    weight : str
-        The weight string (e.g. ``"Bold"``).
-    version : str
-        The version string stored in the font.
-    copyright : str
-        Copyright notice embedded in the font.
-    em_size : int
-        The units-per-em value.
-    ascent : int
-        The font ascent value.
-    descent : int
-        The font descent value (negative in fontforge convention).
-    """
-
-    def __init__(self, ff_font: "fontforge.font") -> None:
-        self._ff = ff_font
-
-    # ------------------------------------------------------------------
-    # Properties backed by the fontforge font object
-    # ------------------------------------------------------------------
-
-    @property
-    def family_name(self) -> str:
-        return self._ff.familyname or ""
-
-    @family_name.setter
-    def family_name(self, value: str) -> None:
-        self._ff.familyname = value
-
-    @property
-    def full_name(self) -> str:
-        return self._ff.fullname or ""
-
-    @full_name.setter
-    def full_name(self, value: str) -> None:
-        self._ff.fullname = value
-
-    @property
-    def weight(self) -> str:
-        return self._ff.weight or ""
-
-    @weight.setter
-    def weight(self, value: str) -> None:
-        self._ff.weight = value
-
-    @property
-    def version(self) -> str:
-        return self._ff.version or ""
-
-    @version.setter
-    def version(self, value: str) -> None:
-        self._ff.version = value
-
-    @property
-    def copyright(self) -> str:
-        return self._ff.copyright or ""
-
-    @copyright.setter
-    def copyright(self, value: str) -> None:
-        self._ff.copyright = value
-
-    @property
-    def em_size(self) -> int:
-        return int(self._ff.em)
-
-    @em_size.setter
-    def em_size(self, value: int) -> None:
-        self._ff.em = value
-
-    @property
-    def ascent(self) -> int:
-        return int(self._ff.ascent)
-
-    @ascent.setter
-    def ascent(self, value: int) -> None:
-        self._ff.ascent = value
-
-    @property
-    def descent(self) -> int:
-        return int(self._ff.descent)
-
-    @descent.setter
-    def descent(self, value: int) -> None:
-        self._ff.descent = value
-
-    def __repr__(self) -> str:  # pragma: no cover
-        return (
-            f"FontMetadata(family={self.family_name!r}, weight={self.weight!r}, "
-            f"em={self.em_size})"
-        )
-
-
-class Font:
-    """High-level wrapper around a FontForge font object.
-
-    This class wraps ``fontforge.font`` (obtained via
-    ``fontforge.open()`` or ``fontforge.font()``) and provides a clean,
-    Pythonic interface for font manipulation.
-
-    Do **not** call the constructor directly; use the class methods
-    :meth:`open` and :meth:`new` instead.
-
-    Parameters
-    ----------
-    ff_font : fontforge.font
-        The underlying FontForge font object.
-
-    Examples
-    --------
-    Open an existing font::
-
-        font = Font.open("MyFont.otf")
-        for glyph in font.glyphs:
-            print(glyph.name)
-        font.save("out/MyFont.otf")
-
-    Create a new font from scratch::
-
-        font = Font.new()
-        font.metadata.family_name = "MyFont"
-        g = font.create_glyph(65, "A")
-        font.save("MyFont.ufo", fmt="ufo")
-    """
-
-    def __init__(self, ff_font: "fontforge.font") -> None:
-        self._ff = ff_font
-        self._metadata = FontMetadata(ff_font)
-aifont.core.font — high-level Font wrapper around ``fontforge.font``.
-
-This module provides a clean Pythonic API for opening, inspecting, and
-saving fonts.  All low-level operations are delegated to the underlying
-``fontforge.font`` object.
-
-Architecture constraint
------------------------
-DO NOT modify FontForge source code.  ``import fontforge`` is treated as
-a black-box dependency.
-"""High-level Font wrapper around fontforge.open()."""
-
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Iterator, Optional
-
-try:
-    import fontforge  # type: ignore
-except ImportError:  # pragma: no cover — fontforge not installed in test env
-    fontforge = None  # type: ignore
-
-from aifont.core.glyph import Glyph
-
-
-# ---------------------------------------------------------------------------
-# Export format helpers
-# ---------------------------------------------------------------------------
-
-#: Mapping from a simple format name to the file extension used by fontforge.
-_FORMAT_EXT: dict[str, str] = {
-    "otf": ".otf",
-    "ttf": ".ttf",
-    "woff": ".woff",
-    "woff2": ".woff2",
-    "sfd": ".sfd",
-    "ufo": ".ufo",
-    "pfb": ".pfb",
-    "svg": ".svg",
-}
-
-
-class AIFont:
-    """Pythonic high-level wrapper around a :class:`fontforge.font` object.
-
-    Do **not** instantiate this class directly — use the class-method
-    constructors :meth:`create` or :meth:`open` instead.
-    """
-
-    def __init__(self, _ff_font: object) -> None:
-        """Wrap an existing ``fontforge.font`` object.
-
-        Args:
-            _ff_font: A live ``fontforge.font`` instance.
-        """
-@dataclass
-class FontMetadata:
-    """Structured font metadata."""
-
-    family_name: str = ""
-    full_name: str = ""
-    weight: str = ""
-    version: str = ""
-    copyright: str = ""
-    description: str = ""
-
-
-class Font:
-    """High-level Pythonic wrapper around a FontForge font object.
-
-    Example:
-        >>> font = Font.open("MyFont.otf")
-        >>> print(font.metadata.family_name)
-        >>> font.save("output.otf")
-    """
-
-    def __init__(self, _ff_font=None) -> None:
-        self._ff = _ff_font
-from collections.abc import Iterable
-from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import fontforge as _ff
-
-    from aifont.core.glyph import Glyph
-
-    _FFFont = _ff.font
-
-
-class Font:
-    """Pythonic wrapper over a :class:`fontforge.font` object.
-
-    All low-level operations are delegated to the underlying
-    :class:`fontforge.font` instance — this class never bypasses it.
-
-    Example::
-
-        font = Font.open("path/to/font.otf")
-        for glyph in font.glyphs:
-            print(glyph.name)
-        font.save("output.otf")
-    """
-
-    def __init__(self, _ff_font: _FFFont) -> None:
-        self._font = _ff_font
-
-    # ------------------------------------------------------------------
-    # Construction
-    # ------------------------------------------------------------------
-
-    @classmethod
-    def open(cls, path: str | Path) -> Font:
-        """Open an existing font file and return a :class:`Font` instance."""
-        import fontforge  # noqa: PLC0415
-
-        return cls(fontforge.open(str(path)))
-
-    @classmethod
-    def new(cls, family: str = "Untitled") -> Font:
-        """Create a blank font."""
-        import fontforge  # noqa: PLC0415
-
-        ff_font = fontforge.font()
-        ff_font.familyname = family
-        return cls(ff_font)
-"""
-aifont.core.font — high-level Font wrapper around ``fontforge.open()``.
-
-Responsibilities:
-- Open and save font files.
-- Iterate over glyphs.
-- Read/write font-level metadata (name, family, weight, em size, etc.).
-
-All heavy lifting is delegated to the underlying ``fontforge.font`` object.
-"""
-
-from __future__ import annotations
-
-import math
-from pathlib import Path
-from typing import Iterator, List, Optional, Union
-from pathlib import Path
-from typing import Iterator, Optional
-
-try:
-    import fontforge as _ff
-except ImportError:  # pragma: no cover — fontforge may not be installed
-    _ff = None  # type: ignore[assignment]
-
-
-class Font:
-    """High-level wrapper around a :class:`fontforge.font` object.
-
-    Parameters
-    ----------
-    ff_font:
-        A raw ``fontforge.font`` instance (returned by ``fontforge.open``
-        or ``fontforge.font()``).
-
-    Examples
-    --------
-    >>> font = Font.open("MyFont.otf")
-    >>> for glyph in font.glyphs:
-    ...     print(glyph.name)
-    >>> font.save("/tmp/MyFont-modified.otf")
-    """
-
-    def __init__(self, ff_font: object) -> None:
-        self._ff_font = ff_font
-
-    # ------------------------------------------------------------------
-    # Construction helpers
-from typing import Generator, Optional
-
-try:
-    import fontforge  # type: ignore
-except ImportError:  # pragma: no cover
-    fontforge = None  # type: ignore  # Allow import in environments without FontForge
-
-
-class Font:
-    """Pythonic wrapper around a :class:`fontforge.font` object."""
-
-    def __init__(self, _ff_font: object) -> None:
-        """Initialise from an existing fontforge font object."""
-        self._font = _ff_font
-
-    # ------------------------------------------------------------------
-    # Constructors
-    # ------------------------------------------------------------------
-
-    @classmethod
-    def create(cls, name: str, family: Optional[str] = None) -> "AIFont":
-        """Create a new, empty font.
-
-        Args:
-            name:   The font name (``fontname`` in FontForge terminology).
-            family: Optional family name.  When omitted the family name
-                    defaults to *name*.
-
-        Returns:
-            A new :class:`AIFont` wrapping a freshly created fontforge font.
-
-        Raises:
-            RuntimeError: If FontForge Python bindings are not available.
-
-        Example::
-
-            font = AIFont.create("MyFont", family="Sans-Serif")
-        """
-        if fontforge is None:
-            raise RuntimeError(
-                "fontforge Python bindings are not installed. "
-                "Install FontForge with Python support to use AIFont."
-            )
-        ff = fontforge.font()
-        ff.fontname = name
-        ff.familyname = family if family is not None else name
-        ff.fullname = name
+        """Create a new, empty font and return a :class:`Font` instance."""
+        import aifont.core.font as _self_mod
+        if not _self_mod._FF_AVAILABLE or _self_mod._ff is None:
+            raise RuntimeError("fontforge Python bindings are not available.")
+        ff = _self_mod._ff.font()  # type: ignore[union-attr]
+        if name:
+            ff.fontname = name
+            ff.familyname = name
+            ff.fullname = name
         return cls(ff)
 
     @classmethod
-    def open(cls, path: str | Path) -> "AIFont":
-        """Open an existing font file.
-
-        Supports any format that FontForge can read, including SFD, UFO,
-        OTF, TTF, WOFF, PFB and SVG.
+    def create(cls, name: str, *, family: str = "") -> "Font":
+        """Create a new font with the given *name*.
 
         Args:
-            path: Path to the font file.
+            name:   PostScript font name and default family name.
+            family: Family name (defaults to *name*).
 
         Returns:
-            A new :class:`AIFont` wrapping the loaded font.
+            A new :class:`Font` instance.
+        """
+        font = cls.new()
+        font.name = name
+        font.family = family or name
+        return font
+
+    # ------------------------------------------------------------------
+    # Metadata properties
+    # ------------------------------------------------------------------
+
+    @property
+    def metadata(self) -> FontMetadata:
+        """Return a :class:`FontMetadata` view of this font's metadata."""
+        return FontMetadata(self._font)
+
+    def set_metadata(self, **kwargs: object) -> None:
+        """Set one or more metadata fields on the font.
+
+        Args:
+            **kwargs: Keyword arguments where keys are fontforge attribute
+                      names (``fontname``, ``familyname``, ``em``, etc.).
 
         Raises:
-            FileNotFoundError: If *path* does not exist.
-            RuntimeError:      If FontForge Python bindings are not available.
-
-        Example::
-
-            font = AIFont.open("existing_font.sfd")
+            ValueError: If an unknown field name is passed.
         """
-        if fontforge is None:
-            raise RuntimeError(
-                "fontforge Python bindings are not installed. "
-                "Install FontForge with Python support to use AIFont."
-            )
-        path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"Font file not found: {path}")
-        ff = fontforge.open(str(path))
-        return cls(ff)
-
-    # ------------------------------------------------------------------
-    # Metadata — name
-    # ------------------------------------------------------------------
+        for key, value in kwargs.items():
+            if key not in _METADATA_FIELDS:
+                raise ValueError(
+                    f"Unknown metadata field: {key!r}. "
+                    f"Valid fields: {sorted(_METADATA_FIELDS)}"
+                )
+            setattr(self._font, key, value)
 
     @property
     def name(self) -> str:
-        """The PostScript / internal font name (``fontname``)."""
+        """The PostScript font name (``fontname``)."""
         return str(getattr(self._font, "fontname", "") or "")
 
     @name.setter
     def name(self, value: str) -> None:
-        self._font.fontname = value
+        self._font.fontname = value  # type: ignore[union-attr]
 
-    # ------------------------------------------------------------------
-    # Metadata — family
-    # ------------------------------------------------------------------
+    @property
+    def font_name(self) -> str:
+        """Alias for :attr:`name`."""
+        return self.name
+
+    @font_name.setter
+    def font_name(self, value: str) -> None:
+        self.name = value
 
     @property
     def family(self) -> str:
@@ -638,11 +328,16 @@ class Font:
 
     @family.setter
     def family(self, value: str) -> None:
-        self._font.familyname = value
+        self._font.familyname = value  # type: ignore[union-attr]
 
-    # ------------------------------------------------------------------
-    # Metadata — version
-    # ------------------------------------------------------------------
+    @property
+    def family_name(self) -> str:
+        """Alias for :attr:`family`."""
+        return self.family
+
+    @family_name.setter
+    def family_name(self, value: str) -> None:
+        self.family = value
 
     @property
     def version(self) -> str:
@@ -651,11 +346,7 @@ class Font:
 
     @version.setter
     def version(self, value: str) -> None:
-        self._font.version = value
-
-    # ------------------------------------------------------------------
-    # Metadata — copyright
-    # ------------------------------------------------------------------
+        self._font.version = value  # type: ignore[union-attr]
 
     @property
     def copyright(self) -> str:
@@ -664,189 +355,48 @@ class Font:
 
     @copyright.setter
     def copyright(self, value: str) -> None:
-        self._font.copyright = value
+        self._font.copyright = value  # type: ignore[union-attr]
 
-    # ------------------------------------------------------------------
-    # Glyph management
-    # ------------------------------------------------------------------
+    @property
+    def em_size(self) -> int:
+        """Units per em (typically 1000 or 2048)."""
+        return int(getattr(self._font, "em", 1000))
 
-    def list_glyphs(self) -> List[str]:
-        """Return the names of all glyphs currently in the font.
+    @em_size.setter
+    def em_size(self, value: int) -> None:
+        self._font.em = value  # type: ignore[union-attr]
 
-        Returns:
-            A list of glyph name strings, e.g. ``['A', 'B', 'space', …]``.
+    @property
+    def ascent(self) -> int:
+        """Ascender value in font units."""
+        return int(getattr(self._font, "ascent", 800))
 
-        Example::
+    @ascent.setter
+    def ascent(self, value: int) -> None:
+        self._font.ascent = value  # type: ignore[union-attr]
 
-            names = font.list_glyphs()  # → ['A', 'B', 'C', ...]
-        """
-        names: List[str] = []
-        for name in self._font:
-            names.append(name)
-        return names
+    @property
+    def descent(self) -> int:
+        """Descender value in font units."""
+        return int(getattr(self._font, "descent", 200))
 
-    def add_glyph(self, name: str, unicode_value: int = -1) -> Glyph:
-        """Add a new glyph to the font.
+    @descent.setter
+    def descent(self, value: int) -> None:
+        self._font.descent = value  # type: ignore[union-attr]
 
-        If a glyph with *name* already exists, the existing glyph is returned.
+    @property
+    def italic_angle(self) -> float:
+        """Italic angle in degrees (0 for upright fonts)."""
+        return float(getattr(self._font, "italicangle", 0.0))
 
-        Args:
-            name:          The glyph name (e.g. ``'A'``).
-            unicode_value: Unicode code point to assign, or ``-1`` to
-                           determine it automatically from the glyph name.
+    @italic_angle.setter
+    def italic_angle(self, value: float) -> None:
+        self._font.italicangle = value  # type: ignore[union-attr]
 
-        Returns:
-            A :class:`~aifont.core.glyph.Glyph` wrapper for the new glyph.
-
-        Example::
-
-            glyph = font.add_glyph('A')
-        """
-        ff_glyph = self._font.createChar(unicode_value, name)
-        return Glyph(ff_glyph)
-
-    def remove_glyph(self, name: str) -> None:
-        """Remove a glyph from the font by name.
-
-        Args:
-            name: The glyph name to remove (e.g. ``'Z'``).
-
-        Raises:
-            KeyError: If no glyph with *name* exists in the font.
-
-        Example::
-
-            font.remove_glyph('Z')
-        """
-        if name not in self._font:
-            raise KeyError(f"Glyph '{name}' not found in font.")
-        self._font[name].unlinkThisGlyph()
-        self._font.removeGlyph(name)
-
-    def get_glyph(self, name: str) -> Glyph:
-        """Return a :class:`~aifont.core.glyph.Glyph` wrapper for *name*.
-
-        Args:
-            name: The glyph name (e.g. ``'A'``).
-
-        Raises:
-            KeyError: If no glyph with *name* exists in the font.
-
-        Example::
-
-            g = font.get_glyph('A')
-        """
-        if name not in self._font:
-            raise KeyError(f"Glyph '{name}' not found in font.")
-        return Glyph(self._font[name])
-
-    # ------------------------------------------------------------------
-    # Persistence
-    # ------------------------------------------------------------------
-
-    def save(self, path: str | Path) -> None:
-        """Save the font in FontForge's native SFD format.
-
-        Args:
-            path: Destination ``.sfd`` file path.
-
-        Example::
-
-            font.save("output.sfd")
-        """
-        self._font.save(str(path))
-
-    def export(self, fmt: str, path: Optional[str | Path] = None) -> Path:
-        """Generate a binary font file.
-
-        Args:
-            fmt:  Format name, e.g. ``"otf"``, ``"ttf"``, ``"woff"``,
-                  ``"woff2"``, ``"svg"``.  Case-insensitive.
-            path: Destination file path.  When *None*, the file is created
-                  in the current working directory using the font name and
-                  the appropriate extension.
-
-        Returns:
-            The :class:`~pathlib.Path` of the generated file.
-
-        Raises:
-            ValueError: If *fmt* is not a recognised export format.
-
-        Example::
-
-            out = font.export("otf")          # → Path('MyFont.otf')
-            out = font.export("ttf", "/tmp/my.ttf")
-        """
-        fmt = fmt.lower()
-        ext = _FORMAT_EXT.get(fmt)
-        if ext is None:
-            raise ValueError(
-                f"Unknown export format '{fmt}'. "
-                f"Supported formats: {', '.join(_FORMAT_EXT)}"
-            )
-        if path is None:
-            path = Path(f"{self.name}{ext}")
-        else:
-            path = Path(path)
-        self._font.generate(str(path))
-        return path
-
-    # ------------------------------------------------------------------
-    # Context-manager support
-    # ------------------------------------------------------------------
-
-    def __enter__(self) -> "AIFont":
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.close()
-
-    def close(self) -> None:
-        """Close the underlying fontforge font and release resources."""
-        try:
-            self._font.close()
-        except Exception:
-            pass
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    def open(cls, path: Union[str, Path]) -> "Font":
-        """Open an existing font file.
-
-        Args:
-            path: Path to the font file (.sfd, .otf, .ttf, …).
-    def open(cls, path: str) -> "Font":
-        """Open an existing font file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the font file (OTF, TTF, UFO, SFD, etc.).
-
-        Returns
-        -------
-        Font
-            A new :class:`Font` instance wrapping the loaded font.
-
-        Raises
-        ------
-        OSError
-            If *path* does not exist or cannot be read.
-        """
-        if not os.path.exists(path):
-            raise OSError(f"Font file not found: {path!r}")
-        return cls(fontforge.open(path))
-
-    @classmethod
-    def new(cls) -> "Font":
-        """Create a new, empty font.
-
-        Returns
-        -------
-        Font
-            A new :class:`Font` instance wrapping a blank FontForge font.
-        """
-        return cls(fontforge.font())
+    @property
+    def glyph_count(self) -> int:
+        """Total number of glyphs in the font."""
+        return len(self)
 
     # ------------------------------------------------------------------
     # Glyph access
@@ -854,17 +404,12 @@ class Font:
 
     @property
     def glyphs(self) -> List[Glyph]:
-        """Return all glyphs in the font's default layer.
-
-        Returns
-        -------
-        list of Glyph
-            Ordered list of :class:`~aifont.core.glyph.Glyph` wrappers.
-        """
+        """Return all glyphs in the font as a list of :class:`Glyph` wrappers."""
         result: List[Glyph] = []
-        for name in self._ff:
+        for glyph_name in self._font:  # type: ignore[union-attr]
             try:
-                result.append(Glyph(self._ff[name]))
+                ff_glyph = self._font[glyph_name]  # type: ignore[index]
+                result.append(Glyph(ff_glyph))
             except Exception:  # noqa: BLE001
                 pass
         return result
@@ -875,430 +420,177 @@ class Font:
 
     def __len__(self) -> int:
         """Return the number of glyphs in the font."""
-        return sum(1 for _ in self._ff)
+        return sum(1 for _ in self._font)  # type: ignore[union-attr]
 
     def __contains__(self, item: object) -> bool:
-        """Test membership by glyph name or Unicode code-point.
-
-        Parameters
-        ----------
-        item : str or int
-            Glyph name (str) or Unicode code-point (int).
-        """
+        """Test membership by glyph name or Unicode code-point."""
         try:
-            _ = self._ff[item]  # type: ignore[index]
+            _ = self._font[item]  # type: ignore[index]
             return True
         except Exception:  # noqa: BLE001
             return False
 
-    def __getitem__(self, key: "str | int") -> Glyph:
-        """Return the glyph identified by *key*.
-
-        Parameters
-        ----------
-        key : str or int
-            Glyph name (str) or Unicode code-point (int).
-
-        Raises
-        ------
-        KeyError
-            If no glyph with the given name/code-point exists.
-        """
+    def __getitem__(self, key: Union[str, int]) -> Glyph:
+        """Return the glyph identified by *key* (name or code-point)."""
         try:
-            return Glyph(self._ff[key])
+            return Glyph(self._font[key])  # type: ignore[index]
         except Exception as exc:
             raise KeyError(key) from exc
 
-    def get_glyph(self, name_or_codepoint: "str | int") -> Optional[Glyph]:
-        """Return a glyph by name or code-point, or *None* if absent.
-
-        Parameters
-        ----------
-        name_or_codepoint : str or int
-            Glyph name or Unicode code-point.
-    def open(cls, path: str | Path) -> "Font":
-        """Open an existing font file.
-
-        Args:
-            path: Path to the font file (.otf, .ttf, .sfd, …).
-
-        Returns:
-            A :class:`Font` wrapping the loaded fontforge font.
-
-        Raises:
-            RuntimeError: If the fontforge bindings are not available.
-        """
-        if _fontforge is None:
-            raise RuntimeError("fontforge Python bindings are not available.")
-        ff = _fontforge.open(str(path))
-        return cls(ff)
-
-    @classmethod
-            path: Path to an OTF, TTF, or SFD font file.
-
-        Returns:
-            A new :class:`Font` instance.
-
-        Raises:
-            RuntimeError: If the fontforge bindings are unavailable.
-        """
-        if fontforge is None:
-            raise RuntimeError("fontforge Python bindings are not available.")
-        return cls(fontforge.open(str(path)))
-
-    @classmethod
-            FileNotFoundError: If the file does not exist.
-            RuntimeError: If FontForge cannot open the file.
-        """
-        path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"Font file not found: {path}")
-        if fontforge is None:
-            raise RuntimeError("fontforge Python bindings are not installed.")
-        """Open a font file and return a :class:`Font` instance.
-
-        Parameters
-        ----------
-        path:
-            Absolute or relative path to a font file (.otf, .ttf, .sfd, …).
-
-        Raises
-        ------
-        RuntimeError
-            If FontForge is not installed.
-        FileNotFoundError
-            If *path* does not exist.
-        """
-        if _ff is None:
-            raise RuntimeError(
-                "fontforge Python bindings are not installed. "
-                "Install FontForge to use Font.open()."
-            )
-        resolved = Path(path).resolve()
-        if not resolved.exists():
-            raise FileNotFoundError(f"Font file not found: {path!r}")
-        return cls(_ff.open(str(resolved)))
-
-    @classmethod
-    def new(cls, family_name: str = "Untitled") -> "Font":
-        """Create a new, empty :class:`Font`.
-
-        Parameters
-        ----------
-        family_name:
-            The font family name to assign to the new font.
-
-        Raises
-        ------
-        RuntimeError
-            If FontForge is not installed.
-        """
-        if _ff is None:
-            raise RuntimeError(
-                "fontforge Python bindings are not installed. "
-                "Install FontForge to use Font.new()."
-            )
-        ff_font = _ff.font()
-        ff_font.familyname = family_name
-        ff_font.fontname = family_name.replace(" ", "-")
-        return cls(ff_font)
-
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
-
-    @property
-    def metadata(self) -> FontMetadata:
-        """Return structured font metadata."""
-        return self._metadata
-
-    @property
-    def glyphs(self) -> List["Glyph"]:
-        """Return all glyphs in the font as a list of Glyph wrappers."""
-        from aifont.core.glyph import Glyph as _Glyph
-
-        result: List["Glyph"] = []
-        for glyph_name in self._ff:  # type: ignore[union-attr]
-            ff_glyph = self._ff[glyph_name]  # type: ignore[index]
-            result.append(_Glyph(ff_glyph))
-        return result
-
-    @property
-    def glyph_count(self) -> int:
-        """Return the number of glyphs in the font."""
+    def glyph(self, name_or_codepoint: Union[str, int]) -> Optional[Glyph]:
+        """Return a :class:`Glyph` by name or code-point, or ``None`` if absent."""
         try:
-            return len(list(self._ff))  # type: ignore[arg-type]
-        except TypeError:
-            return 0
-
-    # ------------------------------------------------------------------
-    # Operations
-    # ------------------------------------------------------------------
-
-    def get_glyph(self, name: str) -> "Glyph":
-        """Return a Glyph by name."""
-        from aifont.core.glyph import Glyph as _Glyph
-
-        try:
-            ff_glyph = self._ff[name]  # type: ignore[index]
-        except (KeyError, TypeError) as exc:
-            raise KeyError(f"Glyph not found: {name}") from exc
-        return _Glyph(ff_glyph)
-    def raw(self) -> object:
-        """The underlying ``fontforge.font`` object."""
-        return self._ff_font
-
-    @property
-    def family_name(self) -> str:
-        """The font family name."""
-        return str(getattr(self._ff_font, "familyname", ""))
-
-    @family_name.setter
-    def family_name(self, value: str) -> None:
-        self._ff_font.familyname = value
-
-    @property
-    def font_name(self) -> str:
-        """The PostScript font name."""
-        return str(getattr(self._ff_font, "fontname", ""))
-
-    @font_name.setter
-    def font_name(self, value: str) -> None:
-        self._ff_font.fontname = value
-
-    @property
-    def em_size(self) -> int:
-        """Units per em (typically 1000 or 2048)."""
-        return int(getattr(self._ff_font, "em", 1000))
-
-    @property
-    def italic_angle(self) -> float:
-        """Italic angle in degrees (0 for upright fonts)."""
-        return float(getattr(self._ff_font, "italicangle", 0.0))
-
-    @italic_angle.setter
-    def italic_angle(self, value: float) -> None:
-        self._ff_font.italicangle = value
-
-    @property
-    def ascent(self) -> int:
-        """Ascender value in font units."""
-        return int(getattr(self._ff_font, "ascent", 800))
-
-    @property
-    def descent(self) -> int:
-        """Descender value in font units (positive number)."""
-        return int(getattr(self._ff_font, "descent", 200))
-
-    @property
-    def metadata(self) -> dict:
-        """A dictionary of basic font metadata."""
-        return {
-            "family_name": self.family_name,
-            "font_name": self.font_name,
-            "em_size": self.em_size,
-            "italic_angle": self.italic_angle,
-            "ascent": self.ascent,
-            "descent": self.descent,
-        }
-
-    # ------------------------------------------------------------------
-    # Glyph iteration
-    # ------------------------------------------------------------------
-
-    @property
-    def glyphs(self) -> Iterator["Glyph"]:
-        """Iterate over all glyphs in the font.
-
-        Yields
-        ------
-        Glyph
-            Each glyph wrapped in :class:`~aifont.core.glyph.Glyph`.
-        """
-        from aifont.core.glyph import Glyph
-
-        for name in self._ff_font:
-            try:
-                ff_glyph = self._ff_font[name]
-                yield Glyph(ff_glyph)
-            except (KeyError, TypeError):
-                continue
-
-    def get_glyph(self, name: str) -> Optional["Glyph"]:
-        """Return the :class:`~aifont.core.glyph.Glyph` with the given name.
-
-        Parameters
-        ----------
-        name:
-            PostScript glyph name (e.g. ``"A"``).
-
-        Returns
-        -------
-        Glyph or None
-        """
-        try:
-            return Glyph(self._ff[name_or_codepoint])
+            return Glyph(self._font[name_or_codepoint])  # type: ignore[index]
         except Exception:  # noqa: BLE001
             return None
 
+    def get_glyph(self, name_or_codepoint: Union[str, int]) -> Glyph:
+        """Return a :class:`Glyph` by name or code-point.
+
+        Raises:
+            KeyError: If no such glyph exists.
+        """
+        g = self.glyph(name_or_codepoint)
+        if g is None:
+            raise KeyError(name_or_codepoint)
+        return g
+
+    def list_glyphs(self) -> List[str]:
+        """Return a list of all glyph names in the font."""
+        return [g.name for g in self.glyphs]
+
+    def add_glyph(self, name: str, unicode_val: int = -1) -> Glyph:
+        """Create a new glyph with the given *name* (chainable alias for create_glyph).
+
+        Args:
+            name:        Glyph name.
+            unicode_val: Unicode code-point (default ``-1`` = no assignment).
+
+        Returns:
+            The newly created :class:`Glyph`.
+        """
+        return self.create_glyph(name, unicode_val)
+
     def create_glyph(
-        self, unicode_point: int = -1, name: Optional[str] = None
+        self,
+        name_or_unicode: Union[str, int],
+        unicode_or_name: Union[str, int, None] = None,
     ) -> Glyph:
         """Create a new glyph in the font.
 
-        Parameters
-        ----------
-        unicode_point : int, optional
-            Unicode code-point for the glyph. Use ``-1`` to create an
-            unnamed glyph without a code-point assignment.
-        name : str, optional
-            Glyph name. When *None* and *unicode_point* is valid the
-            name is auto-assigned by FontForge.
+        Accepts two calling conventions:
 
-        Returns
-        -------
-        Glyph
-            The newly created :class:`~aifont.core.glyph.Glyph`.
+        * ``create_glyph(name, unicode_val)`` — name first, code-point second.
+        * ``create_glyph(unicode_val, name)`` — code-point first, name second.
+
+        Args:
+            name_or_unicode: Glyph name (str) or Unicode code-point (int).
+            unicode_or_name: Unicode code-point (int) or glyph name (str).
+
+        Returns:
+            The newly created :class:`Glyph`.
         """
-        if name is not None:
-            ff_glyph = self._ff.createChar(unicode_point, name)
+        if isinstance(name_or_unicode, str):
+            name = name_or_unicode
+            unicode_val = int(unicode_or_name) if unicode_or_name is not None else -1
         else:
-            ff_glyph = self._ff.createChar(unicode_point)
+            unicode_val = int(name_or_unicode)
+            name = str(unicode_or_name) if unicode_or_name is not None else None  # type: ignore[assignment]
+
+        if name is not None:
+            ff_glyph = self._font.createChar(unicode_val, name)  # type: ignore[union-attr]
+        else:
+            ff_glyph = self._font.createChar(unicode_val)  # type: ignore[union-attr]
         return Glyph(ff_glyph)
 
-    # ------------------------------------------------------------------
-    # Metadata
-            ``None`` if the glyph does not exist.
-        """
-        from aifont.core.glyph import Glyph
+    def remove_glyph(self, name: str) -> None:
+        """Remove a glyph from the font by name.
 
-        try:
-            return Glyph(self._ff_font[name])
-        except (KeyError, TypeError):
-            return None
+        Raises:
+            KeyError: If no glyph with *name* exists.
+        """
+        if name not in self._font:  # type: ignore[operator]
+            raise KeyError(f"Glyph '{name}' not found in font.")
+        self._font.removeGlyph(name)  # type: ignore[union-attr]
 
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
 
-    def save(self, path: str | Path, fmt: Optional[str] = None) -> None:
-        """Save the font to *path*.
+    def save(self, path: Union[str, Path], fmt: Optional[str] = None) -> None:
+        """Save the font.
 
-        Parameters
-        ----------
-        path:
-            Output file path.  The extension determines the format unless
-            *fmt* is given.
-        fmt:
-            Optional explicit format string passed to
-            ``fontforge.font.generate`` (e.g. ``"otf"``).
-        """
-        out = str(Path(path))
-        if fmt is not None:
-            self._ff_font.generate(out, flags=(), layer="Fore")
-        else:
-            self._ff_font.save(out)
-
-    def close(self) -> None:
-        """Close the font and free fontforge resources."""
-        try:
-            self._ff_font.close()
         Args:
-            path: Path to the font file (.sfd, .otf, .ttf, …).
+            path: Destination file path.
+            fmt:  Optional format string (passed as second arg to fontforge save).
+        """
+        if fmt is not None:
+            self._font.save(str(path), fmt)  # type: ignore[union-attr]
+        else:
+            self._font.save(str(path))  # type: ignore[union-attr]
+
+    def generate(self, path: Union[str, Path], flags: Optional[tuple] = None) -> None:
+        """Generate (compile) the font to *path*.
+
+        Args:
+            path:  Destination file path.
+            flags: Optional fontforge generate flags tuple.
+        """
+        if flags:
+            self._font.generate(str(path), flags=flags)  # type: ignore[union-attr]
+        else:
+            self._font.generate(str(path))  # type: ignore[union-attr]
+
+    def export(self, fmt: str, path: Optional[Union[str, Path]] = None) -> Path:
+        """Generate a binary font file.
+
+        Args:
+            fmt:  Format name (e.g. ``"otf"``, ``"ttf"``, ``"woff2"``).
+            path: Destination file path. Defaults to ``<fontname>.<ext>``.
 
         Returns:
-            A new :class:`Font` wrapping the loaded font.
+            The :class:`~pathlib.Path` of the generated file.
 
         Raises:
-            RuntimeError: If the fontforge Python bindings are unavailable.
-            IOError: If the file cannot be opened by FontForge.
+            ValueError: If the format is not recognised.
         """
-        if fontforge is None:
-            raise RuntimeError(
-                "fontforge Python bindings are not available. "
-                "Install FontForge with Python support."
+        fmt = fmt.lower()
+        _FORMAT_EXT: Dict[str, str] = {
+            "otf": ".otf",
+            "ttf": ".ttf",
+            "woff": ".woff",
+            "woff2": ".woff2",
+            "sfd": ".sfd",
+            "ufo": ".ufo",
+            "pfb": ".pfb",
+            "svg": ".svg",
+        }
+        if fmt not in _FORMAT_EXT:
+            raise ValueError(
+                f"Unknown export format: {fmt!r}. "
+                f"Supported formats: {', '.join(sorted(_FORMAT_EXT))}"
             )
-            RuntimeError: If FontForge cannot open the file.
-        """
-        if fontforge is None:
-            raise RuntimeError("fontforge Python bindings are not available.")
-        ff = fontforge.open(str(path))
-        return cls(ff)
-
-    @classmethod
-    def new(cls, family_name: str = "Untitled") -> "Font":
-        """Create a new empty font.
-
-        Args:
-            family_name: The family name for the new font.
-
-        Returns:
-            A new :class:`Font` instance.
-        """
-        if fontforge is None:
-            raise RuntimeError("fontforge Python bindings are not installed.")
-        ff = fontforge.font()
-        ff.familyname = family_name
-        ff.fontname = family_name.replace(" ", "")
-        ff.fullname = family_name
-        return cls(ff)
-
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
-
-    @property
-    def metadata(self) -> FontMetadata:
-        """Font-level metadata (family name, weight, em size, …)."""
-        return self._metadata
-
-    # ------------------------------------------------------------------
-    # Encoding & Unicode
-    # ------------------------------------------------------------------
-
-    def set_encoding(self, encoding: str = "UnicodeBMP") -> None:
-        """Set the font encoding.
-
-        Parameters
-        ----------
-        encoding : str
-            Encoding name (e.g. ``"UnicodeBMP"``, ``"ISO8859-1"``).
-            Defaults to ``"UnicodeBMP"``.
-        """
-        self._ff.encoding = encoding
-
-    # ------------------------------------------------------------------
-    # Save / generate
-    # ------------------------------------------------------------------
-
-    def save(self, path: str, fmt: Optional[str] = None) -> None:
-        """Save the font to *path*.
-
-        *fmt* is forwarded to fontforge.font.save() if provided.
-        """
-        if fmt is not None:
-            self._ff.save(path, fmt)  # type: ignore[union-attr]
+        ext = _FORMAT_EXT[fmt]
+        if path is None:
+            path = Path(f"{self.name}{ext}")
         else:
-            self._ff.save(path)  # type: ignore[union-attr]
-
-    def generate(self, path: str) -> None:
-        """Generate (compile) the font to *path*."""
-        self._ff.generate(path)  # type: ignore[union-attr]
+            path = Path(path)
+        if fmt == "sfd":
+            self._font.save(str(path))  # type: ignore[union-attr]
+        else:
+            self._font.generate(str(path))  # type: ignore[union-attr]
+        return path
 
     def close(self) -> None:
-        """Close the underlying fontforge font object."""
-        if hasattr(self._ff, "close"):
-            self._ff.close()  # type: ignore[union-attr]
+        """Close the underlying fontforge font and release resources."""
+        try:
+            self._font.close()  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001
+            pass
 
     # ------------------------------------------------------------------
-    # Iteration / context manager
+    # Context manager
     # ------------------------------------------------------------------
-
-    def __iter__(self) -> Iterator["Glyph"]:
-        return iter(self.glyphs)
-
-    def __len__(self) -> int:
-        return self.glyph_count
 
     def __enter__(self) -> "Font":
         return self
@@ -1306,485 +598,17 @@ class Font:
     def __exit__(self, *_: object) -> None:
         self.close()
 
-    def __repr__(self) -> str:
-        return f"Font(name={self.metadata.name!r}, glyphs={self.glyph_count})"
-        When *fmt* is not specified the format is inferred from the file
-        extension.
-
-        Parameters
-        ----------
-        path : str
-            Destination file path.
-        fmt : str, optional
-            Explicit format override: ``"otf"``, ``"ttf"``, ``"woff2"``,
-            ``"ufo"``, ``"sfd"``, etc.  When *None* the extension of
-            *path* is used.
-
-        Raises
-        ------
-        ValueError
-            If the format cannot be determined from the extension and no
-            *fmt* was given.
-        """
-        ext = fmt or os.path.splitext(path)[1].lstrip(".").lower()
-        if not ext:
-            raise ValueError(
-                "Cannot determine format; provide fmt= or use a known extension."
-            )
-
-        # Map friendly names to fontforge generate flags
-        _FMT_MAP: Dict[str, str] = {
-            "otf": "opentype",
-            "ttf": "ttf",
-            "woff": "woff",
-            "woff2": "woff2",
-            "ufo": "ufo3",
-            "ufo3": "ufo3",
-            "sfd": "",  # native save
-        }
-
-        if ext == "sfd":
-            self._ff.save(path)
-        else:
-            ff_fmt = _FMT_MAP.get(ext, ext)
-            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-            self._ff.generate(path, ff_fmt)
-        """Return structured font metadata."""
-        if self._ff is None:
-            return FontMetadata()
-        return FontMetadata(
-            family_name=getattr(self._ff, "familyname", ""),
-            full_name=getattr(self._ff, "fullname", ""),
-            weight=getattr(self._ff, "weight", ""),
-            version=getattr(self._ff, "version", ""),
-            copyright=getattr(self._ff, "copyright", ""),
-            description=getattr(self._ff, "comment", ""),
-        )
-
-    @metadata.setter
-    def metadata(self, meta: FontMetadata) -> None:
-        """Update font metadata from a :class:`FontMetadata` object."""
-        if self._ff is None:
-            return
-        self._ff.familyname = meta.family_name
-        self._ff.fullname = meta.full_name
-        self._ff.weight = meta.weight
-        self._ff.version = meta.version
-        self._ff.copyright = meta.copyright
-        self._ff.comment = meta.description
-
-    @property
-    def glyphs(self) -> list[Glyph]:
-        """Return all glyphs in the font."""
-        if self._ff is None:
-            return []
-        return [Glyph(self._ff[name]) for name in self._ff]
-
     # ------------------------------------------------------------------
-    # Save / export helpers
+    # Repr
     # ------------------------------------------------------------------
-
-    def save(self, path: str | Path, fmt: Optional[str] = None) -> None:
-        """Save the font.
-
-        Args:
-            path: Destination path.
-            fmt:  Optional format string (e.g. ``"otf"``, ``"ttf"``).
-                  Inferred from *path* extension when omitted.
-        """
-        if self._ff is None:
-            raise RuntimeError("No font loaded.")
-        path = Path(path)
-        if fmt is None:
-            fmt = path.suffix.lstrip(".")
-        fmt_map = {"otf": "opentype", "ttf": "truetype", "woff2": "woff2", "sfd": "sfd"}
-        ff_fmt = fmt_map.get(fmt.lower(), fmt)
-        if ff_fmt == "sfd":
-            self._ff.save(str(path))
-        else:
-            self._ff.generate(str(path))
-
-    def close(self) -> None:
-        """Close the underlying FontForge font and release resources."""
-        if self._ff is not None:
-            self._ff.close()
-            self._ff = None
-    def new(cls) -> "Font":
-        """Create a new, empty font.
-
-        Returns:
-            A new :class:`Font` wrapping a blank fontforge font.
-
-        Raises:
-            RuntimeError: If the fontforge Python bindings are unavailable.
-        """
-        if fontforge is None:
-            raise RuntimeError(
-                "fontforge Python bindings are not available. "
-                "Install FontForge with Python support."
-            )
-            A new :class:`Font` instance.
-
-        Raises:
-            RuntimeError: If the fontforge bindings are unavailable.
-        """
-        if fontforge is None:
-            raise RuntimeError("fontforge Python bindings are not available.")
-        return cls(fontforge.font())
-            A :class:`Font` wrapping a blank fontforge font.
-
-        Raises:
-            RuntimeError: If the fontforge bindings are not available.
-        """
-        if _fontforge is None:
-            raise RuntimeError("fontforge Python bindings are not available.")
-        ff = _fontforge.font()
-            A new :class:`Font` wrapping a blank fontforge font.
-        """
-        if fontforge is None:
-            raise RuntimeError("fontforge Python bindings are not available.")
-        ff = fontforge.font()
-        return cls(ff)
-
-    # ------------------------------------------------------------------
-    # Persistence
-    # ------------------------------------------------------------------
-
-    def save(self, path: str | Path, fmt: Optional[str] = None) -> None:
-    def save(self, path: Union[str, Path], fmt: Optional[str] = None) -> None:
-        """Save the font.
-
-        When *fmt* is ``None`` the font is saved in FontForge's native SFD
-        format via ``font.save()``.  When *fmt* is provided (e.g. ``"otf"``,
-        ``"ttf"``, ``"woff2"``) the font is exported via ``font.generate()``
-        using *path*; if *path* does not already carry the right extension it
-        is appended automatically so that FontForge infers the correct output
-        format from the filename.
-
-        Args:
-            path: Destination file path.
-            fmt:  Optional target format extension without a leading dot
-                  (e.g. ``"otf"``, ``"ttf"``).  When *None* the font is saved
-                  in SFD format.
-        """
-        p = Path(path)
-        if fmt is None:
-            self._font.save(str(p))
-        else:
-            # Ensure the file extension matches the requested format so that
-            # FontForge can determine the output format from the filename.
-            ext = fmt.lstrip(".")
-            if p.suffix.lstrip(".").lower() != ext.lower():
-                p = p.with_suffix(f".{ext}")
-            self._font.generate(str(p))
-    def save(self, path: str | Path, fmt: Optional[str] = None) -> None:
-        """Save the font in FontForge's native SFD format or another format.
-
-        Args:
-            path: Destination file path.
-            fmt:  Optional format string (e.g. ``"otf"``).  When *None* the
-                  format is inferred from the file extension.
-    def save(self, path: str | Path, fmt: str | None = None) -> None:
-        """Save the font to *path*.
-
-        Args:
-            path: Destination file path.
-            fmt:  Optional fontforge format string (e.g. ``"otf"``).
-        """
-        if fmt:
-            self._font.generate(str(path))
-    def save(self, path: str | Path, fmt: Optional[str] = None) -> None:
-        """Save the font.
-
-        Args:
-            path: Destination file path.
-            fmt:  Optional format string passed to ``fontforge.font.save``
-                  (e.g. ``"otf"``).  When *None* the format is inferred from
-                  the file extension.
-        """
-        if fmt is not None:
-            self._font.save(str(path), fmt)
-        else:
-            self._font.save(str(path))
-
-    def generate(self, path: str | Path, flags: tuple = ()) -> None:
-        """Generate (export) the font to a binary format.
-
-        Args:
-            path:  Destination file path (.otf, .ttf, …).
-            flags: Tuple of fontforge generation flags.
-        """
-        self._font.generate(str(path), flags=flags)
-
-    # ------------------------------------------------------------------
-    # Glyph access
-    # ------------------------------------------------------------------
-
-    @property
-    def glyphs(self) -> List["Glyph"]:
-        """Return a list of :class:`~aifont.core.glyph.Glyph` wrappers.
-
-        Only glyphs that are actually present in the font's encoding are
-        returned.
-    def glyphs(self) -> list:
-        """Return a list of raw fontforge glyph objects in this font."""
-        result = []
-        for name in self._font:
-            try:
-                result.append(self._font[name])
-    def glyphs(self) -> Iterable:
-        """Iterate over all glyphs in the font."""
-        from aifont.core.glyph import Glyph  # noqa: PLC0415
-
-        for name in self._font:
-            yield Glyph(self._font[name])
-
-    def glyph(self, name_or_codepoint: str | int) -> Glyph:
-        """Return a :class:`~aifont.core.glyph.Glyph` by name or codepoint."""
-        from aifont.core.glyph import Glyph  # noqa: PLC0415
-
-        return Glyph(self._font[name_or_codepoint])
-    def glyphs(self) -> list:
-        """Return a list of :class:`~aifont.core.glyph.Glyph` wrappers.
-
-        Only glyphs that are present in the font (i.e. have an encoding slot
-        assigned and contain actual outline data or metrics) are returned.
-        """
-        from aifont.core.glyph import Glyph  # local import avoids circular deps
-
-        result: List[Glyph] = []
-        result = []
-        for name in self._font:
-            try:
-                result.append(Glyph(self._font[name]))
-            except Exception:
-                pass
-        return result
-
-    def __iter__(self) -> Iterator["Glyph"]:
-        """Iterate over glyphs in the font."""
-        return iter(self.glyphs)
-
-    def glyph(self, name_or_unicode: Union[str, int]) -> "Glyph":
-    def glyph(self, name_or_unicode: str | int) -> "Glyph":
-        """Return a single :class:`~aifont.core.glyph.Glyph` by name or codepoint.
-
-        Args:
-            name_or_unicode: Glyph name (str) or Unicode code point (int).
-
-        Returns:
-            A :class:`~aifont.core.glyph.Glyph` wrapper.
-            :class:`~aifont.core.glyph.Glyph` wrapper.
-        """
-        from aifont.core.glyph import Glyph
-
-        return Glyph(self._font[name_or_unicode])
-
-    def create_glyph(self, name: str, unicode_point: int = -1) -> "Glyph":
-        """Create a new glyph in the font.
-
-        Args:
-            name: Glyph name.
-            unicode_point: Unicode code point, or -1 for no mapping.
-
-        Returns:
-            A :class:`~aifont.core.glyph.Glyph` wrapper for the new glyph.
-        """
-        from aifont.core.glyph import Glyph
-
-        ff_glyph = self._font.createChar(unicode_point, name)
-        return Glyph(ff_glyph)
-
-    # ------------------------------------------------------------------
-    # Metadata
-    # ------------------------------------------------------------------
-
-    @property
-    def metadata(self) -> dict:
-        """Font-level metadata as a plain dictionary.
-
-        Keys: ``fontname``, ``familyname``, ``fullname``, ``weight``,
-        ``copyright``, ``em``, ``ascent``, ``descent``, ``upos``,
-        ``uwidth``.
-        """
-    # ------------------------------------------------------------------
-    # Metadata
-    # ------------------------------------------------------------------
-
-    @property
-    def metadata(self) -> dict:
-        """Font-level metadata as a plain dictionary."""
-        f = self._font
-        return {
-            "family_name": getattr(f, "familyname", ""),
-            "full_name": getattr(f, "fullname", ""),
-            "weight": getattr(f, "weight", ""),
-            "version": getattr(f, "version", ""),
-            "copyright": getattr(f, "copyright", ""),
-            "em_size": getattr(f, "em", 1000),
-            "ascent": getattr(f, "ascent", 800),
-            "descent": getattr(f, "descent", 200),
-        }
-
-    # ------------------------------------------------------------------
-    # Internal
-    def metadata(self) -> dict[str, str]:
-        """Return a dict of common font metadata fields."""
-        f = self._font
-        return {
-            "family": getattr(f, "familyname", ""),
-            "full_name": getattr(f, "fullname", ""),
-            "weight": getattr(f, "weight", ""),
-            "copyright": getattr(f, "copyright", ""),
-            "version": getattr(f, "version", ""),
-            "em_size": str(getattr(f, "em", 1000)),
-        }
-
-    @metadata.setter
-    def metadata(self, data: dict[str, str]) -> None:
-        field_map = {
-            "family": "familyname",
-            "full_name": "fullname",
-            "weight": "weight",
-            "copyright": "copyright",
-            "version": "version",
-        }
-        for key, ff_attr in field_map.items():
-            if key in data:
-                setattr(self._font, ff_attr, data[key])
-
-    # ------------------------------------------------------------------
-    # Low-level access
-    # ------------------------------------------------------------------
-
-    @property
-    def ff_font(self) -> "fontforge.font":
-        """The underlying ``fontforge.font`` object.
-
-        Use this only when you need functionality not yet covered by
-        the AIFont wrapper API.
-        """
-        return self._ff
-
-    def __repr__(self) -> str:  # pragma: no cover
-        return (
-            f"Font(family={self.metadata.family_name!r}, "
-            f"glyphs={len(self)})"
-        )
-    def _raw(self) -> _FFFont:
-        """Direct access to the underlying :class:`fontforge.font` object."""
-        return self._font
-
-    def __repr__(self) -> str:  # pragma: no cover
-        name = getattr(self._font, "familyname", "?")
-        return f"<Font family={name!r}>"
-    def metadata(self) -> dict:
-        """Font-level metadata as a plain dictionary."""
-        ff = self._font
-        return {
-            "fontname": getattr(ff, "fontname", ""),
-            "familyname": getattr(ff, "familyname", ""),
-            "fullname": getattr(ff, "fullname", ""),
-            "weight": getattr(ff, "weight", ""),
-            "copyright": getattr(ff, "copyright", ""),
-            "em": getattr(ff, "em", 1000),
-            "ascent": getattr(ff, "ascent", 800),
-            "descent": getattr(ff, "descent", 200),
-            "upos": getattr(ff, "upos", -100),
-            "uwidth": getattr(ff, "uwidth", 50),
-        }
-
-    def set_metadata(self, **kwargs: object) -> None:
-        """Set font-level metadata fields.
-
-        Accepted keyword arguments match the keys returned by
-        :attr:`metadata`.
-
-        Example::
-
-            font.set_metadata(fontname="MyFont", familyname="My Family")
-        """
-        _allowed = {
-            "fontname", "familyname", "fullname", "weight",
-            "copyright", "em", "ascent", "descent", "upos", "uwidth",
-        }
-        for key, value in kwargs.items():
-            if key not in _allowed:
-                raise ValueError(f"Unknown metadata field: {key!r}")
-            setattr(self._font, key, value)
-
-    # ------------------------------------------------------------------
-    # Internals / helpers
-    # ------------------------------------------------------------------
-
-    @property
-    def _ff(self) -> object:
-            "version": getattr(ff, "version", ""),
-        }
-
-    @property
-    def path(self) -> Optional[str]:
-        """The file path this font was opened from, or *None* for new fonts."""
-        return getattr(self._font, "path", None)
-
-    # ------------------------------------------------------------------
-    # Internal access
-    # ------------------------------------------------------------------
-
-    @property
-    def _ff(self) -> object:
-        """Direct access to the underlying ``fontforge.font`` (internal use)."""
-        return self._font
 
     def __repr__(self) -> str:
-        return f"<AIFont name={self.name!r} family={self.family!r}>"
-        """Direct access to the underlying fontforge font object (internal use)."""
-        return self._font
-
-    def __repr__(self) -> str:
-        name = getattr(self._font, "fontname", "?")
-        """The raw fontforge font object (use only inside aifont.core)."""
-        return self._font
-            "copyright": getattr(ff, "copyright", ""),
-            "version": getattr(ff, "version", ""),
-            "em": getattr(ff, "em", 0),
-            "ascent": getattr(ff, "ascent", 0),
-            "descent": getattr(ff, "descent", 0),
-            "upos": getattr(ff, "upos", 0),
-            "uwidth": getattr(ff, "uwidth", 0),
-        }
-
-    def set_metadata(self, **kwargs: object) -> None:
-        """Update font-level metadata fields.
-
-        Keyword arguments correspond to fontforge font attributes such as
-        ``fontname``, ``familyname``, ``weight``, etc.
-        """
-        for key, value in kwargs.items():
-            setattr(self._font, key, value)
-
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
-
-    @property
-    def _ff(self):
-        """Direct access to the underlying fontforge font object (internal use)."""
-        return self._font
-
-    def close(self) -> None:
-        """Close the underlying fontforge font and release resources."""
-        self._font.close()
-
-    def __repr__(self) -> str:
-        name = getattr(self._font, "fontname", "<unknown>")
-        return f"<Font: {name!r}>"
         try:
-            self._font.close()
-        except Exception:
-            pass
+            n = len(self)
+        except Exception:  # noqa: BLE001
+            n = "?"  # type: ignore[assignment]
+        return f"Font(name={self.name!r}, family={self.family!r}, glyphs={n})"
 
-    def __repr__(self) -> str:
-        return f"Font(family_name={self.family_name!r}, em={self.em_size})"
-        name = getattr(self._font, "fontname", "<unknown>")
-        return f"<Font '{name}'>"
+
+# AIFont is an alias for Font, providing a more product-specific name.
+AIFont = Font

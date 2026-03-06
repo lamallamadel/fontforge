@@ -30,7 +30,7 @@ def test_font_report_defaults():
     assert report.kern_pair_count == 0
     assert report.open_contours == []
     assert report.issues == []
-    assert report.passed() is True
+    assert report.passed is True
 
 
 def test_font_report_str():
@@ -122,7 +122,7 @@ class TestFontReport:
             validation_score=1.0,
             metrics_summary={},
         )
-        assert report.passed() is True
+        assert report.passed is True
 
     def test_not_passed_when_issues(self):
         issue = GlyphIssue("A", "open_contour", "Contour is not closed")
@@ -136,7 +136,7 @@ class TestFontReport:
             validation_score=0.9,
             metrics_summary={},
         )
-        assert report.passed() is False
+        assert report.passed is False
 
     def test_issues_by_type(self):
         i1 = GlyphIssue("A", "open_contour", "msg")

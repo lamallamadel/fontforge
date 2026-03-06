@@ -61,10 +61,6 @@ Repository = "https://github.com/fontforge/fontforge"
 Issues = "https://github.com/fontforge/fontforge/issues"
 Changelog = "https://github.com/fontforge/fontforge/releases"
 
-[tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["tests/aifont"]
-
 [tool.scikit-build]
 # Enable experimental features for custom version provider
 experimental = true
@@ -150,10 +146,6 @@ before-all = "brew install freetype libxml2 libpng jpeg libtiff brotli"
 # Repair wheels with delocate
 repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} {wheel}"
 
-[tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["tests/aifont"]
-
 [tool.cibuildwheel.windows]
 # Build for 64-bit only
 archs = ["AMD64"]
@@ -219,13 +211,3 @@ directory = "htmlcov"
 
 [tool.coverage.xml]
 output = "coverage.xml"
-# pytest configuration
-# ============================================================================
-
-[tool.pytest.ini_options]
-# Add the repository root to sys.path so `import aifont` works without install
-pythonpath = ["."]
-testpaths = ["tests"]
-[tool.pytest.ini_options]
-pythonpath = ["."]
-asyncio_mode = "auto"

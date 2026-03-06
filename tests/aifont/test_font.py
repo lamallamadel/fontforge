@@ -469,7 +469,7 @@ class TestGlyph:
 
     def test_repr_contains_name(self) -> None:
         assert "A" in repr(self.glyph)
-Unit tests for aifont.core.font.
+"""Unit tests for aifont.core.font.
 
 Tests run with FontForge available (via ``import fontforge``).
 Each test is isolated and operates on in-memory font objects.
