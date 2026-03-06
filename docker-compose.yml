@@ -1,0 +1,54 @@
+services:
+  # ---------------------------------------------------------------------------
+  # AIFont API server
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: aifont-api:local
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Override with your LLM provider key when using AI agents
+      # - OPENAI_API_KEY=sk-...
+      # - ANTHROPIC_API_KEY=...
+    volumes:
+      # Mount source for live-reload during development
+      - ./aifont:/app/aifont:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Development tools (only started with --profile dev)
+  # ---------------------------------------------------------------------------
+  lint:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - ./aifont:/app/aifont
+    working_dir: /app
+    command: >
+      sh -c "pip install ruff && ruff check aifont/ && ruff format --check aifont/"
+
+  test:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - ./aifont:/app/aifont
+    working_dir: /app
+    command: >
+      sh -c "pip install pytest pytest-cov && pytest aifont/tests/ --cov=aifont --cov-report=term-missing"

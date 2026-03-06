@@ -1,3 +1,9 @@
+"""AIFont core — high-level wrappers around FontForge Python bindings."""
+
+from aifont.core.analyzer import analyze
+from aifont.core.font import Font
+from aifont.core.glyph import Glyph
+from aifont.core.metrics import auto_space, get_kern_pairs, set_kern
 """AIFont core SDK — wraps fontforge Python bindings with a clean Pythonic API."""
 
 from aifont.core.analyzer import FontAnalyzer, FontReport, analyze
@@ -15,6 +21,10 @@ from aifont.core.analyzer import analyze, FontReport
 __all__ = [
     "Font",
     "Glyph",
+    "get_kern_pairs",
+    "set_kern",
+    "auto_space",
+    "analyze",
     "simplify",
     "remove_overlap",
     "correct_directions",
