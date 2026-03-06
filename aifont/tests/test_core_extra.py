@@ -79,13 +79,12 @@ class TestExportHelpers:
             assert path.parent.exists()
 
     def test_convert_ttf_to_woff2_missing_file(self):
+        import pytest
+
         from aifont.core.export import _convert_ttf_to_woff2
 
-        try:
+        with pytest.raises((RuntimeError, FileNotFoundError, OSError)):
             _convert_ttf_to_woff2("/nonexistent/in.ttf", "/nonexistent/out.woff2")
-            assert False, "Expected an exception for nonexistent file"
-        except (RuntimeError, FileNotFoundError, OSError):
-            pass  # expected
 
 
 class TestExportFunctions:
@@ -274,16 +273,15 @@ class TestContourModule:
         ff.removeOverlap.assert_called_once()
 
     def test_transform_validates_matrix_length(self):
+        import pytest
+
         from aifont.core.contour import transform
         from aifont.core.glyph import Glyph
 
         ff = MagicMock()
         g = Glyph(ff)
-        try:
+        with pytest.raises(ValueError):
             transform(g, [1, 0, 0, 1])  # 4 elements — invalid
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
     def test_transform_applies_matrix(self):
         from aifont.core.contour import transform
@@ -385,15 +383,14 @@ class TestFontAdditional:
         assert ff.familyname == "UpdatedFamily"
 
     def test_set_metadata_invalid_field(self):
+        import pytest
+
         from aifont.core.font import Font
 
         ff = _make_mock_ff()
         font = Font(ff)
-        try:
+        with pytest.raises(ValueError):
             font.set_metadata(unknownfield="x")
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
     def test_font_metadata_getitem_em_size_string(self):
         from aifont.core.font import FontMetadata
@@ -418,15 +415,14 @@ class TestFontAdditional:
         assert ff.familyname == "NewFamily"
 
     def test_font_metadata_setitem_invalid_key(self):
+        import pytest
+
         from aifont.core.font import FontMetadata
 
         ff = _make_mock_ff()
         meta = FontMetadata(ff)
-        try:
+        with pytest.raises(KeyError):
             meta["badkey"] = "value"
-            assert False, "Expected KeyError"
-        except KeyError:
-            pass
 
     def test_repr_contains_family(self):
         from aifont.core.font import Font
@@ -723,7 +719,7 @@ class TestSvgParserExtended:
             font = MagicMock()
             font._font = MagicMock(spec=["em"])
             font._font.em = 1000
-            result = svg_to_glyph(path, font, 0x0041, "A")
+            svg_to_glyph(path, font, 0x0041, "A")
             # May return None or nothing; should not raise
         except Exception:
             pass  # acceptable if fontforge is unavailable
@@ -841,22 +837,21 @@ class TestFontExtended:
         assert "em_size" in meta
 
     def test_new_raises_without_fontforge(self):
+        import pytest
+
         import aifont.core.font as fmod
         from aifont.core.font import Font
-        with patch.object(fmod, "_FF_AVAILABLE", False):
-            try:
-                Font.new("Test")
-                assert False, "Expected RuntimeError"
-            except RuntimeError:
-                pass
+
+        with patch.object(fmod, "_FF_AVAILABLE", False), pytest.raises(RuntimeError):
+            Font.new("Test")
 
     def test_open_raises_for_missing_file(self):
+        import pytest
+
         from aifont.core.font import Font
-        try:
+
+        with pytest.raises(FileNotFoundError):
             Font.open("/nonexistent/file.sfd")
-            assert False, "Expected FileNotFoundError"
-        except FileNotFoundError:
-            pass
 
 
 # ===========================================================================
@@ -1187,13 +1182,13 @@ class TestVariableBuildDesignSpace:
             pytest.skip("fontTools not available")
 
     def test_build_design_space_without_fonttools(self):
+        import pytest
+
         with patch("aifont.core.variable._FONTTOOLS_AVAILABLE", False):
             from aifont.core.variable import _build_design_space
-            try:
+
+            with pytest.raises(ImportError):
                 _build_design_space([], [], [])
-                assert False, "Expected ImportError"
-            except ImportError:
-                pass
 
     def test_variable_font_builder_build_design_space(self):
         try:
@@ -1225,13 +1220,13 @@ class TestExportExtended:
         return MagicMock(spec=["generate", "save"])
 
     def test_export_variable_no_fonttools(self):
+        import contextlib
+
         from aifont.core.export import export_variable
-        with patch("aifont.core.export._FONTTOOLS_AVAILABLE", False):
-            try:
-                result = export_variable(self._make_raw_ff(), "/tmp/out.ttf")
-                # May succeed or fail gracefully
-            except (RuntimeError, AttributeError):
-                pass  # expected
+
+        with patch("aifont.core.export._FONTTOOLS_AVAILABLE", False), contextlib.suppress(RuntimeError, AttributeError):
+            export_variable(self._make_raw_ff(), "/tmp/out.ttf")
+            # May succeed or fail gracefully
 
     def test_subset_font_no_fonttools(self):
         from aifont.core.export import subset_font
@@ -1243,7 +1238,7 @@ class TestExportExtended:
                 import tempfile
                 with tempfile.TemporaryDirectory() as tmpdir:
                     out = os.path.join(tmpdir, "out.woff2")
-                    result = subset_font(ff, out, [])
+                    subset_font(ff, out, [])
             except Exception:
                 pass  # acceptable
 
@@ -1329,13 +1324,12 @@ class TestFontWithGlyphs:
         assert isinstance(g, Glyph)
 
     def test_getitem_missing_raises_key_error(self):
+        import pytest
+
         font, ff = _make_font_with_glyphs()
         ff.__getitem__ = MagicMock(side_effect=KeyError("Z"))
-        try:
+        with pytest.raises(KeyError):
             _ = font["Z"]
-            assert False, "Expected KeyError"
-        except KeyError:
-            pass
 
     def test_glyph_by_codepoint(self):
         from aifont.core.glyph import Glyph
@@ -1344,13 +1338,12 @@ class TestFontWithGlyphs:
         assert isinstance(g, Glyph)
 
     def test_get_glyph_raises_on_missing(self):
+        import pytest
+
         font, ff = _make_font_with_glyphs()
         ff.__getitem__ = MagicMock(side_effect=KeyError("Z"))
-        try:
+        with pytest.raises(KeyError):
             font.get_glyph("Z")
-            assert False, "Expected KeyError"
-        except KeyError:
-            pass
 
     def test_list_glyphs(self):
         font, _ = _make_font_with_glyphs()
@@ -1380,12 +1373,11 @@ class TestFontWithGlyphs:
             ff.save.assert_called()
 
     def test_export_unknown_raises(self):
+        import pytest
+
         font, _ = _make_font_with_glyphs()
-        try:
+        with pytest.raises(ValueError):
             font.export("xyz", "/tmp/out.xyz")
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
     def test_close(self):
         font, ff = _make_font_with_glyphs()

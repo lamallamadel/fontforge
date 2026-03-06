@@ -23,7 +23,7 @@ try:
     import psMat  # type: ignore  # noqa: N813 — tests patch aifont.core.glyph.psMat
 except ImportError:  # pragma: no cover
     fontforge = None  # type: ignore
-    psMat = None  # type: ignore
+    psMat = None  # type: ignore  # noqa: N816
 
 
 def _make_ps_mat() -> Any:

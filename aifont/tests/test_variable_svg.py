@@ -19,22 +19,20 @@ class TestVariationAxis:
         assert ax.hidden is False
 
     def test_invalid_tag_length(self):
+        import pytest
+
         from aifont.core.variable import VariationAxis
 
-        try:
+        with pytest.raises(ValueError):
             VariationAxis("wg", "Weight", minimum=100, default=400, maximum=900)
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
     def test_invalid_range(self):
+        import pytest
+
         from aifont.core.variable import VariationAxis
 
-        try:
+        with pytest.raises(ValueError):
             VariationAxis("wght", "Weight", minimum=900, default=400, maximum=100)
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
     def test_from_tag_known(self):
         from aifont.core.variable import VariationAxis
@@ -57,13 +55,12 @@ class TestVariationAxis:
         assert ax.tag == "CSTM"
 
     def test_from_tag_unknown_no_values_raises(self):
+        import pytest
+
         from aifont.core.variable import VariationAxis
 
-        try:
+        with pytest.raises(ValueError):
             VariationAxis.from_tag("UNKN")
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
 
 class TestNamedInstance:
@@ -112,13 +109,12 @@ class TestInterpolate:
         assert interpolate(0.0, 100.0, 1.0) == 100.0
 
     def test_out_of_range(self):
+        import pytest
+
         from aifont.core.variable import interpolate
 
-        try:
+        with pytest.raises(ValueError):
             interpolate(0.0, 100.0, 1.5)
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
 
 class TestLocationToNormalized:
@@ -149,14 +145,13 @@ class TestLocationToNormalized:
         assert result["wght"] == -1.0
 
     def test_unknown_axis_raises(self):
+        import pytest
+
         from aifont.core.variable import VariationAxis, location_to_normalized
 
         ax = VariationAxis("ital", "Italic", minimum=0.0, default=0.0, maximum=1.0)
-        try:
+        with pytest.raises(ValueError):
             location_to_normalized({"wght": 400.0}, [ax])
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
 
 class TestPreviewInterpolation:
@@ -257,15 +252,15 @@ class TestVariableFontBuilder:
         assert len(builder.instances) == 1
 
     def test_conformance_empty_raises_or_returns_errors(self):
+        import contextlib
+
         from aifont.core.variable import VariableFontBuilder
 
         builder = VariableFontBuilder()
         # build_design_space without fonttools or with no masters raises
-        try:
+        with contextlib.suppress(Exception):
             builder.build_design_space()
             # If fonttools available, returns a doc
-        except Exception:
-            pass  # expected without masters
 
 
 # ===========================================================================

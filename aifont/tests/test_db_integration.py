@@ -28,9 +28,9 @@ sqlalchemy = pytest.importorskip(
     reason="sqlalchemy not installed — skipping DB integration tests",
 )
 
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import create_engine, inspect  # noqa: E402
+from sqlalchemy.exc import IntegrityError  # noqa: E402
+from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Database URL — falls back gracefully so tests are skipped in CI without PG

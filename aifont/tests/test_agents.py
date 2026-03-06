@@ -65,7 +65,7 @@ class TestDesignAgent:
         result = agent._extract_glyph_name("draw letter b please")
         assert result == "B"
 
-    def test_extract_glyph_name_no_match_returns_A(self):
+    def test_extract_glyph_name_no_match_returns_default(self):
         from aifont.agents.design_agent import DesignAgent
 
         agent = DesignAgent()
@@ -614,15 +614,14 @@ class TestQAAgentExtended:
 
 class TestExportAgentMoreCoverage:
     def test_export_unsupported_format_raises(self):
+        import pytest
+
         from aifont.agents.export_agent import ExportAgent
 
         agent = ExportAgent()
         font = _make_font_wrapper()
-        try:
+        with pytest.raises(ValueError):
             agent._export(font, "/tmp/out.xyz", "xyz")
-            assert False, "Expected ValueError"
-        except ValueError:
-            pass
 
     def test_export_validate_file_missing(self):
         from pathlib import Path
