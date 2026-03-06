@@ -18,6 +18,26 @@ class Glyph:
     """
 
     def __init__(self, _ff_glyph: _FFGlyph) -> None:
+"""
+aifont.core.glyph — Glyph wrapper around ``fontforge.glyph``.
+
+Responsibilities:
+- Access contours / paths.
+- Get and set advance width and side-bearings.
+- Read / write Unicode mapping.
+
+This module wraps fontforge glyph objects; it does **not** subclass them.
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+
+class Glyph:
+    """Pythonic wrapper around a ``fontforge.glyph`` object."""
+
+    def __init__(self, _ff_glyph: object) -> None:
         self._glyph = _ff_glyph
 
     # ------------------------------------------------------------------
@@ -27,6 +47,7 @@ class Glyph:
     @property
     def name(self) -> str:
         """Glyph name (e.g. ``"A"``, ``"uni0041"``)."""
+        """PostScript glyph name."""
         return self._glyph.glyphname
 
     @property
@@ -37,6 +58,9 @@ class Glyph:
     @unicode.setter
     def unicode(self, codepoint: int) -> None:
         self._glyph.unicode = codepoint
+
+        """Unicode code point, or ``-1`` if unmapped."""
+        return self._glyph.unicode
 
     # ------------------------------------------------------------------
     # Metrics
@@ -53,6 +77,12 @@ class Glyph:
 
     def set_width(self, value: int) -> None:
         """Set advance width (fluent alternative to ``glyph.width = value``)."""
+    def set_width(self, value: int) -> None:
+        """Set the advance width in font units.
+
+        Args:
+            value: New advance width.
+        """
         self._glyph.width = value
 
     @property
@@ -70,6 +100,14 @@ class Glyph:
     @right_side_bearing.setter
     def right_side_bearing(self, value: int) -> None:
         self._glyph.right_side_bearing = value
+
+        """Left side-bearing in font units."""
+        return self._glyph.left_side_bearing
+
+    @property
+    def right_side_bearing(self) -> int:
+        """Right side-bearing in font units."""
+        return self._glyph.right_side_bearing
 
     # ------------------------------------------------------------------
     # Contours
@@ -102,3 +140,37 @@ class Glyph:
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Glyph name={self.name!r} unicode={self.unicode}>"
+    def contours(self):
+        """Return the foreground layer contour/path data (fontforge layer object)."""
+        return self._glyph.foreground
+
+    @property
+    def has_open_contours(self) -> bool:
+        """Return True if any foreground contour is open (not closed)."""
+        layer = self._glyph.foreground
+        for contour in layer:
+            if not contour.closed:
+                return True
+        return False
+
+    # ------------------------------------------------------------------
+    # Utilities
+    # ------------------------------------------------------------------
+
+    def copy_from(self, other: "Glyph") -> None:
+        """Copy contour data from *other* into this glyph.
+
+        Args:
+            other: Source :class:`Glyph` to copy from.
+        """
+        self._glyph.clear()
+        pen = self._glyph.glyphPen()
+        other._glyph.draw(pen)
+
+    @property
+    def _ff(self):
+        """Direct access to the underlying fontforge glyph object (internal use)."""
+        return self._glyph
+
+    def __repr__(self) -> str:
+        return f"<Glyph '{self.name}' U+{self.unicode:04X}>" if self.unicode >= 0 else f"<Glyph '{self.name}'>"
