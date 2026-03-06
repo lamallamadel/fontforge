@@ -1,0 +1,304 @@
+# ============================================================================
+# AIFont CD — continuous deployment pipeline
+# ============================================================================
+# Stages:
+#   1. Build & push Docker image to registry
+#   2. Deploy to **staging** automatically on merge to main
+#   3. Deploy to **production** with manual approval gate
+#   4. Post-deployment health check; auto-rollback on failure
+#   5. Slack notification on every deploy attempt (success or failure)
+# ============================================================================
+# Required secrets (configure in repo Settings → Secrets → Actions):
+#   REGISTRY_TOKEN        — Container registry token (GHCR PAT)
+#   RENDER_API_KEY        — Render.com API key
+#   RENDER_STAGING_SVC    — Render staging service ID
+#   RENDER_PROD_SVC       — Render production service ID
+#   SLACK_WEBHOOK_URL     — Incoming webhook for deploy notifications
+# ============================================================================
+
+name: AIFont CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "aifont/**"
+      - "Dockerfile"
+      - ".github/workflows/aifont-cd.yml"
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/aifont-api
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. Build & push versioned Docker image
+  # --------------------------------------------------------------------------
+  build-and-push:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_digest: ${{ steps.push.outputs.digest }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.REGISTRY_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # --------------------------------------------------------------------------
+  # 2. Deploy to staging (automatic on merge to main)
+  # --------------------------------------------------------------------------
+  deploy-staging:
+    name: Deploy — staging
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: read
+    environment:
+      name: staging
+      url: https://aifont-staging.onrender.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger Render staging deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SVC: ${{ secrets.RENDER_STAGING_SVC }}
+        run: |
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            "https://api.render.com/v1/services/$RENDER_SVC/deploys" \
+            -d '{"clearCache": false}'
+
+      - name: Wait for staging to become healthy
+        id: health_staging
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SVC: ${{ secrets.RENDER_STAGING_SVC }}
+        run: |
+          echo "Polling staging health…"
+          for i in $(seq 1 60); do
+            STATUS=$(curl -sf \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$RENDER_SVC" \
+              | python3 .github/workflows/scripts/render_deploy_status.py 2>/dev/null || echo "unknown")
+            echo "  Attempt $i: status=$STATUS"
+            if [ "$STATUS" = "live" ]; then
+              echo "staging_healthy=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "staging_healthy=false" >> "$GITHUB_OUTPUT"
+          exit 1
+
+  # --------------------------------------------------------------------------
+  # 3. Deploy to production (requires manual approval)
+  # --------------------------------------------------------------------------
+  deploy-production:
+    name: Deploy — production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    permissions:
+      contents: read
+    # The 'production' GitHub environment must have a "Required reviewer" rule
+    # configured so this job pauses until an approver clicks "Approve".
+    environment:
+      name: production
+      url: https://aifont.onrender.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger Render production deploy
+        id: deploy_prod
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SVC: ${{ secrets.RENDER_PROD_SVC }}
+        run: |
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            "https://api.render.com/v1/services/$RENDER_SVC/deploys" \
+            -d '{"clearCache": false}'
+
+      - name: Wait for production health check
+        id: health_prod
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SVC: ${{ secrets.RENDER_PROD_SVC }}
+        run: |
+          for i in $(seq 1 60); do
+            STATUS=$(curl -sf \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$RENDER_SVC" \
+              | python3 .github/workflows/scripts/render_deploy_status.py 2>/dev/null || echo "unknown")
+            echo "  Attempt $i: status=$STATUS"
+            if [ "$STATUS" = "live" ]; then
+              echo "prod_healthy=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "prod_healthy=false" >> "$GITHUB_OUTPUT"
+          exit 1
+
+  # --------------------------------------------------------------------------
+  # 4. Automatic rollback on production failure
+  # --------------------------------------------------------------------------
+  rollback-production:
+    name: Rollback — production
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    permissions:
+      contents: read
+    # Only run if the production deploy failed.
+    if: failure() && needs.deploy-production.result == 'failure'
+    environment:
+      name: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Roll back to previous Render deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SVC: ${{ secrets.RENDER_PROD_SVC }}
+        run: |
+          echo "Fetching previous successful deploy ID…"
+          PREV_DEPLOY=$(curl -sf \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            "https://api.render.com/v1/services/$RENDER_SVC/deploys?limit=5" \
+            | python3 .github/workflows/scripts/render_find_prev_deploy.py 2>/dev/null || echo "")
+
+          if [ -z "$PREV_DEPLOY" ]; then
+            echo "Could not find a previous live deploy — manual rollback required."
+            exit 1
+          fi
+
+          echo "Rolling back to deploy $PREV_DEPLOY…"
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            "https://api.render.com/v1/services/$RENDER_SVC/deploys/$PREV_DEPLOY/rollback"
+          echo "Rollback triggered successfully."
+
+  # --------------------------------------------------------------------------
+  # 5. Slack notification
+  # --------------------------------------------------------------------------
+  notify:
+    name: Slack notification
+    runs-on: ubuntu-latest
+    permissions: {}
+    # Always run, so we get notified on both success and failure.
+    if: always()
+    needs:
+      - build-and-push
+      - deploy-staging
+      - deploy-production
+      - rollback-production
+
+    steps:
+      - name: Determine overall status
+        id: status
+        run: |
+          if [ "${{ needs.deploy-production.result }}" = "success" ]; then
+            echo "color=#36a64f" >> "$GITHUB_OUTPUT"
+            echo "emoji=:white_check_mark:" >> "$GITHUB_OUTPUT"
+            echo "text=Production deploy succeeded" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.rollback-production.result }}" = "success" ]; then
+            echo "color=#ff9800" >> "$GITHUB_OUTPUT"
+            echo "emoji=:rewind:" >> "$GITHUB_OUTPUT"
+            echo "text=Production deploy FAILED — rolled back" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.deploy-staging.result }}" = "success" ]; then
+            echo "color=#2196f3" >> "$GITHUB_OUTPUT"
+            echo "emoji=:rocket:" >> "$GITHUB_OUTPUT"
+            echo "text=Staging deploy succeeded (prod pending approval)" >> "$GITHUB_OUTPUT"
+          else
+            echo "color=#e53935" >> "$GITHUB_OUTPUT"
+            echo "emoji=:x:" >> "$GITHUB_OUTPUT"
+            echo "text=Deploy pipeline FAILED" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "${{ steps.status.outputs.emoji }} *AIFont CD* — ${{ steps.status.outputs.text }}\n*Branch:* `${{ github.ref_name }}`  |  *Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>\n*Triggered by:* ${{ github.actor }}"
+                      }
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": { "type": "plain_text", "text": "View workflow run" },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
