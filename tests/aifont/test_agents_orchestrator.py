@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from aifont.agents.orchestrator import AgentResult, Orchestrator, PipelineResult
 
 
@@ -109,5 +107,59 @@ class TestOrchestrator:
 
         # Run just the first step by disabling others
         orch._build_pipeline = lambda p, f: [(agent.run, "design")]
+        result = orch.run("test", font=font)
+        assert result.steps[0].success is True
+
+    def test_run_step_explicit_failure_no_retry(self, font):
+        """_run_step: agent returns explicit success=False, no retries left."""
+        orch = Orchestrator(max_retries=0)
+
+        failure_result = MagicMock()
+        failure_result.success = False
+        failure_result.message = "explicit failure"
+        failure_result.confidence = 0.0
+        agent = MagicMock()
+        agent.run.return_value = failure_result
+        orch.register("design", agent)
+        orch._build_pipeline = lambda p, f: [(agent.run, "design")]
+
+        result = orch.run("test", font=font)
+        assert result.steps[0].success is False
+
+    def test_run_step_explicit_failure_with_retry(self, font):
+        """_run_step: agent returns explicit success=False, retried once."""
+        orch = Orchestrator(max_retries=1)
+
+        failure = MagicMock()
+        failure.success = False
+        failure.message = "fail"
+        failure.confidence = 0.0
+
+        success = MagicMock()
+        success.success = True
+        success.confidence = 0.9
+
+        agent = MagicMock()
+        agent.run.side_effect = [failure, success]
+        orch.register("design", agent)
+        orch._build_pipeline = lambda p, f: [(agent.run, "design")]
+
+        result = orch.run("test", font=font)
+        assert result.steps[0].success is True
+
+    def test_run_step_fallback_all_low_confidence(self, font):
+        """When all retries are exhausted with low confidence, the orchestrator
+        accepts the last result as successful (does not discard it)."""
+        orch = Orchestrator(max_retries=1, confidence_threshold=0.9)
+
+        low = MagicMock()
+        low.success = True
+        low.confidence = 0.3
+        agent = MagicMock()
+        agent.run.return_value = low  # always returns low confidence
+        orch.register("design", agent)
+        orch._build_pipeline = lambda p, f: [(agent.run, "design")]
+
+        # After max_retries exhausted, last attempt always returns success=True
         result = orch.run("test", font=font)
         assert result.steps[0].success is True

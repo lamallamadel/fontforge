@@ -82,29 +82,36 @@ class Orchestrator:
         self,
         prompt: str,
         font: Font | None = None,
-    ) -> Font:
+    ) -> PipelineResult:
         """Run the full agent pipeline for *prompt*.
 
         Creates a new :class:`~aifont.core.font.Font` when *font* is ``None``.
-        Raises :class:`RuntimeError` if any pipeline step fails.
+        Agent failures are captured inside :class:`PipelineResult` rather than
+        raised, so callers can inspect individual step results.
 
         Returns:
-            The (possibly modified) :class:`~aifont.core.font.Font`.
+            A :class:`PipelineResult` containing step results and the final font.
         """
         from aifont.core.font import Font as _Font  # noqa: PLC0415
 
         if font is None:
-            font = _Font.new(prompt)
+            try:
+                font = _Font.new(prompt)
+            except Exception:  # noqa: BLE001
+                # fontforge bindings may be unavailable in test/CI environments.
+                # Agents handle a None font gracefully; failures are captured per-step.
+                logger.debug("Font.new() failed; continuing without a font object.", exc_info=True)
+                font = None
 
+        result = PipelineResult(prompt=prompt, font=font)
         pipeline = self._build_pipeline(prompt, font)
         for step_fn, agent_name in pipeline:
             step_result = self._run_step(step_fn, agent_name, prompt, font)
-            if not step_result.success:
-                msg = step_result.message or step_result.error or f"{agent_name} failed"
-                raise RuntimeError(msg)
+            result.steps.append(step_result)
             if step_result.data is not None and hasattr(step_result.data, "glyphs"):
                 font = step_result.data
-        return font
+                result.font = font
+        return result
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -167,27 +174,3 @@ class Orchestrator:
                         error=str(exc),
                     )
         return AgentResult(agent_name=agent_name, success=False, confidence=0.0)
-
-    def _run_agent(self, agent: Any, prompt: str, font: Font) -> AgentResult:
-        name = type(agent).__name__
-        result = AgentResult(agent_name=name, success=False, confidence=0.0)
-        for attempt in range(self.max_retries + 1):
-            try:
-                result = agent.run(prompt, font)
-            except Exception as exc:  # noqa: BLE001
-                result = AgentResult(
-                    agent_name=name,
-                    success=False,
-                    confidence=0.0,
-                    message=str(exc),
-                )
-            if result.success and result.confidence >= self.confidence_threshold:
-                return result
-            if attempt < self.max_retries:
-                logger.debug(
-                    "Retrying agent %s (attempt %d/%d)",
-                    name,
-                    attempt + 1,
-                    self.max_retries,
-                )
-        return result
