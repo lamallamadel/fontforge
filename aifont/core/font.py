@@ -63,9 +63,16 @@ class FontMetadata:
     # ------------------------------------------------------------------
 
     def __contains__(self, key: object) -> bool:
-        return key in _METADATA_FIELDS
+        return key in _METADATA_FIELDS or key in ("family", "em_size")
 
     def __getitem__(self, key: str) -> object:
+        # Friendly aliases
+        if key == "family":
+            ff = object.__getattribute__(self, "_ff")
+            return str(getattr(ff, "familyname", "") or "")
+        if key == "em_size":
+            ff = object.__getattribute__(self, "_ff")
+            return str(int(getattr(ff, "em", 1000)))
         if key not in _METADATA_FIELDS:
             raise KeyError(key)
         ff = object.__getattribute__(self, "_ff")
@@ -232,6 +239,11 @@ class Font:
         return self._font
 
     @property
+    def _raw(self) -> object:
+        """Alias for :attr:`raw` — the underlying fontforge font object."""
+        return self._font
+
+    @property
     def raw(self) -> object:
         """The underlying ``fontforge.font`` object."""
         return self._font
@@ -295,6 +307,23 @@ class Font:
     def metadata(self) -> FontMetadata:
         """Return a :class:`FontMetadata` view of this font's metadata."""
         return FontMetadata(self._font)
+
+    @metadata.setter
+    def metadata(self, value: dict) -> None:
+        """Apply a dict of metadata fields to this font.
+
+        Recognised keys: ``"family"`` (→ ``familyname``), ``"name"``
+        (→ ``fontname``), ``"weight"``, ``"version"``, ``"copyright"``,
+        ``"em_size"`` (→ ``em``), and any raw fontforge attribute name.
+        """
+        _alias = {
+            "family": "familyname",
+            "name": "fontname",
+            "em_size": "em",
+        }
+        for k, v in value.items():
+            attr = _alias.get(k, k)
+            setattr(self._font, attr, v)
 
     def set_metadata(self, **kwargs: object) -> None:
         """Set one or more metadata fields on the font.

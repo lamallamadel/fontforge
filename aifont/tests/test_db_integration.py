@@ -22,6 +22,12 @@ import uuid
 from collections.abc import Generator
 
 import pytest
+
+sqlalchemy = pytest.importorskip(
+    "sqlalchemy",
+    reason="sqlalchemy not installed — skipping DB integration tests",
+)
+
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker

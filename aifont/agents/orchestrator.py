@@ -18,7 +18,7 @@ class AgentResult:
 
     agent_name: str
     success: bool
-    confidence: float  # 0.0 – 1.0
+    confidence: float = 0.0  # 0.0 – 1.0
     data: Any = None
     error: str | None = None
     message: str = ""
@@ -82,22 +82,29 @@ class Orchestrator:
         self,
         prompt: str,
         font: Font | None = None,
-    ) -> PipelineResult:
+    ) -> Font:
         """Run the full agent pipeline for *prompt*.
 
-        Returns a :class:`PipelineResult` with the modified font.
+        Creates a new :class:`~aifont.core.font.Font` when *font* is ``None``.
+        Raises :class:`RuntimeError` if any pipeline step fails.
+
+        Returns:
+            The (possibly modified) :class:`~aifont.core.font.Font`.
         """
-        result = PipelineResult(prompt=prompt, font=font)
+        from aifont.core.font import Font as _Font  # noqa: PLC0415
+
+        if font is None:
+            font = _Font.new(prompt)
+
         pipeline = self._build_pipeline(prompt, font)
         for step_fn, agent_name in pipeline:
             step_result = self._run_step(step_fn, agent_name, prompt, font)
-            result.steps.append(step_result)
             if not step_result.success:
-                break
+                msg = step_result.message or step_result.error or f"{agent_name} failed"
+                raise RuntimeError(msg)
             if step_result.data is not None and hasattr(step_result.data, "glyphs"):
-                result.font = step_result.data
-                font = result.font
-        return result
+                font = step_result.data
+        return font
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -112,7 +119,7 @@ class Orchestrator:
 
         design = self._agents.get("design", DesignAgent())
         metrics = self._agents.get("metrics", MetricsAgent())
-        qa = self._agents.get("qa", QAAgent(font))
+        qa = self._agents.get("qa", QAAgent())
         export_agent = self._agents.get("export", ExportAgent())
 
         return [
@@ -132,6 +139,17 @@ class Orchestrator:
         for attempt in range(self.max_retries + 1):
             try:
                 data = step_fn(prompt=prompt, font=font)
+                # Propagate explicit failure from agent result
+                if hasattr(data, "success") and not data.success:
+                    if attempt < self.max_retries:
+                        continue
+                    msg = getattr(data, "message", "") or getattr(data, "error", "") or ""
+                    return AgentResult(
+                        agent_name=agent_name,
+                        success=False,
+                        confidence=0.0,
+                        message=msg,
+                    )
                 confidence = getattr(data, "confidence", 1.0)
                 if confidence >= self.confidence_threshold or attempt == self.max_retries:
                     return AgentResult(

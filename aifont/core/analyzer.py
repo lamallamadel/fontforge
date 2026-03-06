@@ -20,6 +20,49 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class GlobalMetrics:
+    """Global typographic metrics for a font.
+
+    Used by :class:`FontAnalyzer` internal scoring methods.
+    """
+
+    ascent: float = 800.0
+    descent: float = 200.0
+    units_per_em: float = 1000.0
+    cap_height: float = 0.0
+    x_height: float = 0.0
+    italic_angle: float = 0.0
+    underline_position: float = -100.0
+    underline_width: float = 50.0
+    family_name: str = ""
+    full_name: str = ""
+    weight: str = ""
+    version: str = ""
+    copyright: str = ""
+    is_fixed_pitch: bool = False
+    sf_version: str = ""
+
+
+@dataclass
+class GlyphInfo:
+    """Lightweight glyph descriptor used during font analysis."""
+
+    name: str = ""
+    unicode_value: int = -1
+    width: int = 0
+    has_contours: bool = False
+
+
+@dataclass
+class BasicProblem:
+    """A basic font-level or glyph-level problem found during analysis."""
+
+    severity: str = "warning"
+    glyph_name: str | None = None
+    description: str = ""
+
+
+@dataclass
 class GlyphIssue:
     """A single validation issue found in a glyph.
 
@@ -74,6 +117,8 @@ class FontReport:
     family_name: str = ""
     missing_basic_latin: list[int] = field(default_factory=list)
     validation_score: float = 0.0
+    # validation_errors: plain list of error strings (distinct from GlyphIssue objects)
+    validation_errors: list[str] = field(default_factory=list)
     # Alias fields accepted in __init__ for backward compatibility
     coverage_score: float | None = field(default=None, repr=False)
     missing_unicode: list[str] | None = field(default=None, repr=False)
@@ -95,7 +140,9 @@ class FontReport:
 
     @property
     def passed(self) -> bool:
-        """``True`` if no *error*-severity issues are present."""
+        """``True`` if no *error*-severity issues are present and ``validation_errors`` is empty."""
+        if self.validation_errors:
+            return False
         return not any(i.severity == "error" for i in self.issues)
 
     @property
@@ -239,10 +286,55 @@ class FontAnalyzer:
 
     def __init__(self, font: Font) -> None:
         self._font = font
+        self._latin_coverage: float = 0.0
 
     def run(self) -> FontReport:
         """Run the full analysis and return a :class:`FontReport`."""
         return analyze(self._font)
+
+    # ------------------------------------------------------------------
+    # Internal scoring helpers (also used by tests)
+    # ------------------------------------------------------------------
+
+    def _compute_unicode_coverage(self, glyphs: list[GlyphInfo]) -> float:
+        """Compute and cache the fraction of Basic Latin covered by *glyphs*.
+
+        Returns the coverage fraction (0.0 – 1.0).
+        """
+        basic_latin = set(range(0x0020, 0x007F))
+        covered = {g.unicode_value for g in glyphs if g.unicode_value in basic_latin}
+        self._latin_coverage = len(covered) / len(basic_latin) if basic_latin else 0.0
+        return self._latin_coverage
+
+    def _compute_quality_score(
+        self,
+        metrics: GlobalMetrics,
+        glyphs: list[GlyphInfo],
+        problems: list[BasicProblem],
+    ) -> float:
+        """Compute a quality score (0–100) from *metrics*, *glyphs*, and *problems*.
+
+        Higher score = better quality.  The score is penalised by:
+        - Low Basic Latin coverage
+        - Error-severity problems (each −5 points)
+        - Warning-severity problems (each −1 point)
+        """
+        # Start from full coverage
+        latin_coverage = getattr(self, "_latin_coverage", 0.0)
+        score = 40.0 + 60.0 * latin_coverage
+
+        # Penalise for metrics issues (missing cap_height / x_height)
+        if metrics.cap_height <= 0 or metrics.x_height <= 0:
+            score -= 5.0
+
+        # Penalise for problems
+        for p in problems:
+            if p.severity == "error":
+                score -= 5.0
+            else:
+                score -= 1.0
+
+        return max(0.0, min(100.0, score))
 
 
 # ---------------------------------------------------------------------------
