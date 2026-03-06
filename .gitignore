@@ -25,3 +25,10 @@ build-cpp/
 coverage.xml
 htmlcov/
 .pytest_cache/
+site/
+
+# AIFont environment variables (never commit)
+.env
+
+# SSL certificates
+ssl/
