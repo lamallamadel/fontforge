@@ -1,3 +1,4 @@
+"""aifont.core — low-level wrappers around FontForge Python bindings."""
 """AIFont core — high-level wrappers around FontForge Python bindings."""
 
 from aifont.core.analyzer import analyze

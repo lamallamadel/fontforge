@@ -1,3 +1,4 @@
+"""aifont.agents — multi-agent AI layer for font generation and analysis."""
 """AIFont agents — AI-powered font operations built on aifont.core."""
 
 from aifont.agents.orchestrator import Orchestrator

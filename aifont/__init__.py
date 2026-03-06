@@ -1,3 +1,4 @@
+"""AIFont — Python SDK built on top of FontForge."""
 """AIFont — Python SDK and AI agent layer built on top of FontForge.
 
 DO NOT import fontforge here directly; let each sub-module handle it
