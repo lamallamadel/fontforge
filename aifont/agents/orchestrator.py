@@ -11,8 +11,15 @@ if TYPE_CHECKING:
 
 # Attributes extracted from agent results and stored in the shared context.
 # Keys are formatted as "<AgentClassName>.<attr>", e.g. "DesignAgent.glyph_name".
-_CONTEXT_ATTRS = ("confidence", "agent_name", "glyph_name", "svg_data",
-                  "report", "score", "formats")
+_CONTEXT_ATTRS = (
+    "confidence",
+    "agent_name",
+    "glyph_name",
+    "svg_data",
+    "report",
+    "score",
+    "formats",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +244,9 @@ class Orchestrator:
                     if attempt < self.max_retries:
                         logger.debug(
                             "Agent %s reported failure (attempt %d/%d); retrying.",
-                            name, attempt + 1, self.max_retries,
+                            name,
+                            attempt + 1,
+                            self.max_retries,
                         )
                         continue
                     msg = getattr(data, "message", "") or getattr(data, "error", "") or ""
@@ -259,16 +268,21 @@ class Orchestrator:
                     )
 
                 logger.debug(
-                    "Agent %s confidence %.2f below threshold %.2f"
-                    " (attempt %d/%d); retrying.",
-                    name, confidence, self.confidence_threshold,
-                    attempt + 1, self.max_retries,
+                    "Agent %s confidence %.2f below threshold %.2f (attempt %d/%d); retrying.",
+                    name,
+                    confidence,
+                    self.confidence_threshold,
+                    attempt + 1,
+                    self.max_retries,
                 )
 
             except Exception as exc:  # noqa: BLE001
                 logger.debug(
                     "Agent %s raised %r (attempt %d/%d).",
-                    name, exc, attempt + 1, self.max_retries,
+                    name,
+                    exc,
+                    attempt + 1,
+                    self.max_retries,
                 )
                 if attempt == self.max_retries:
                     return AgentResult(
