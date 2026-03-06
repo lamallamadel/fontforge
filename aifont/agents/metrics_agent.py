@@ -76,6 +76,11 @@ class MetricsReport:
     sidebearings_changed: list[GlyphMetricsSnapshot] = field(default_factory=list)
     corrections_applied: list[str] = field(default_factory=list)
     summary: str = ""
+    # Agent-level metadata
+    font: object = field(default=None, repr=False)
+    confidence: float = 0.5
+    spacing_adjusted: bool = False
+    kern_pairs_updated: int = 0
 
     def to_dict(self) -> dict:
         """Return a plain-dict representation (suitable for JSON serialisation)."""
@@ -123,6 +128,10 @@ class MetricsReport:
                 lines.append(f"  • {c}")
         lines += ["=" * 60, self.summary]
         return "\n".join(lines)
+
+
+#: Alias for :class:`MetricsReport` (used by tests and external callers).
+MetricsResult = MetricsReport
 
 
 # ---------------------------------------------------------------------------
@@ -279,21 +288,43 @@ class MetricsAgent:
     # High-level: run (full pipeline)
     # ------------------------------------------------------------------
 
-    def run(self, font: object) -> MetricsReport:
-        """Execute the full metrics optimisation pipeline on *font*.
+    def _interpret_ratio(self, prompt: str) -> float:
+        """Derive a target side-bearing ratio from a natural-language *prompt*.
 
-        Steps
-        -----
-        1. **AnalyzeSpacing** — capture before-state.
-        2. **AutoSpace** (optional) — rebalance side bearings.
-        3. **AutoKern** (optional) — generate or refresh kern pairs.
-        4. **SetKernPair** — apply extra corrections from before-analysis.
-        5. **AnalyzeSpacing** — capture after-state.
-        6. **GenerateReport** — return the structured report.
+        Returns:
+            A float ratio: < 0.15 for tight/compact, > 0.15 for airy/open,
+            0.15 for neutral prompts.
         """
+        low = prompt.lower()
+        if any(w in low for w in ("tight", "compact", "narrow", "dense", "condensed")):
+            return 0.08
+        if any(w in low for w in ("airy", "open", "loose", "wide", "display", "spacious")):
+            return 0.20
+        return 0.15
+
+    def run(self, prompt: str = "", *, font: object | None = None) -> MetricsReport:
+        """Execute the full metrics optimisation pipeline.
+
+        Parameters
+        ----------
+        prompt:
+            Optional natural-language style intent (e.g. ``"tight spacing"``).
+            Used to override the instance-level style intent.
+        font:
+            Font to process.  When ``None`` a no-op report is returned with
+            ``confidence=0.5`` and ``font=None``.
+        """
+        if font is None:
+            return MetricsReport(confidence=0.5, font=None)
+
         corrections: list[str] = []
         kern_pairs_added: list[KernPair] = []
         sidebearings_changed: list[GlyphMetricsSnapshot] = []
+
+        # Honour per-call style intent override
+        if prompt:
+            profile = _resolve_style_profile(prompt)
+            self._target_ratio = profile["target_ratio"]
 
         before = self.analyze_spacing(font)
 
@@ -333,7 +364,7 @@ class MetricsAgent:
 
         after = self.analyze_spacing(font)
 
-        return self.generate_report(
+        report = self.generate_report(
             font,
             before=before,
             after=after,
@@ -341,6 +372,11 @@ class MetricsAgent:
             sidebearings_changed=sidebearings_changed,
             corrections_applied=corrections,
         )
+        report.font = font
+        report.spacing_adjusted = self.apply_autospace
+        report.kern_pairs_updated = len(kern_pairs_added)
+        report.confidence = 0.9
+        return report
 
 
 def _get_ff_font(font_or_wrapper: object) -> object:

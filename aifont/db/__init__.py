@@ -9,7 +9,6 @@ from aifont.db.models import (
     FontProject,
     Glyph,
     KernPair,
-    User,
 )
 
 __all__ = [
@@ -17,7 +16,6 @@ __all__ = [
     "engine",
     "get_session",
     "SessionLocal",
-    "User",
     "FontProject",
     "Font",
     "Glyph",

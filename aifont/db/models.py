@@ -18,7 +18,6 @@ can be created off-line and synced later without collision.
 import enum
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -131,33 +130,6 @@ class TimestampMixin:
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
-
-
-class User(TimestampMixin, Base):
-    """Registered AIFont user account."""
-
-    __tablename__ = "users"
-
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=func.gen_random_uuid(),
-    )
-    email = Column(String(254), unique=True, nullable=False)
-    username = Column(String(64), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    is_active = Column(Boolean, nullable=False, server_default="true")
-
-    # Relationships
-    projects = relationship("FontProject", back_populates="user", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        CheckConstraint("char_length(username) >= 3", name="ck_users_username_min_len"),
-        CheckConstraint("email ~* '^[^@]+@[^@]+\\.[^@]+$'", name="ck_users_email_format"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<User id={self.id} username={self.username!r}>"
 
 
 class FontProject(TimestampMixin, Base):

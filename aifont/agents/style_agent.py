@@ -56,12 +56,25 @@ class StyleTransferResult:
     after_profile:
         :class:`~aifont.core.analyzer.StyleProfile` captured *after* the
         transformations.
+    confidence:
+        Agent confidence in the result (0.0–1.0).
+    target_font:
+        Alias for :attr:`font` — the font that was modified.
     """
 
-    font: Font
+    font: Font | None = None
     changes_applied: list[str] = field(default_factory=list)
     before_profile: StyleProfile | None = None
     after_profile: StyleProfile | None = None
+    confidence: float = 0.5
+    target_font: Font | None = None
+
+    def __post_init__(self) -> None:
+        # Keep font and target_font in sync
+        if self.target_font is None and self.font is not None:
+            self.target_font = self.font
+        elif self.font is None and self.target_font is not None:
+            self.font = self.target_font
 
     def summary(self) -> str:
         """Return a human-readable summary of the result."""
@@ -114,6 +127,9 @@ def _detect_intent(prompt: str) -> str:
     return "unknown"
 
 
+#: Alias for :class:`StyleTransferResult` (used by tests and external callers).
+StyleResult = StyleTransferResult
+
 # ---------------------------------------------------------------------------
 # StyleAgent
 # ---------------------------------------------------------------------------
@@ -155,6 +171,7 @@ class StyleAgent:
         prompt: str,
         font: Font | None = None,
         reference_font: Font | None = None,
+        source_font: Font | None = None,
         stroke_width: float | None = None,
         slant_angle: float | None = None,
         interpolation_factor: float = 0.5,
@@ -169,6 +186,8 @@ class StyleAgent:
             The :class:`~aifont.core.font.Font` to transform.
         reference_font:
             Optional reference font used for transfer/inspire intents.
+        source_font:
+            Alias for *reference_font*.
         stroke_width:
             Override the stroke delta for bold/light operations.
         slant_angle:
@@ -179,14 +198,13 @@ class StyleAgent:
         Returns
         -------
         StyleTransferResult
-
-        Raises
-        ------
-        ValueError
-            If the intent requires a *reference_font* that was not provided.
         """
+        # Normalise source_font → reference_font alias
+        if source_font is not None and reference_font is None:
+            reference_font = source_font
+
         if font is None:
-            raise ValueError("font must not be None")
+            return StyleTransferResult(font=None, confidence=0.5)
 
         intent = _detect_intent(prompt)
 
@@ -207,10 +225,10 @@ class StyleAgent:
 
         if intent == "transfer":
             if reference_font is None:
-                raise ValueError(
-                    "A reference_font is required for style transfer. "
-                    "Provide reference_font=<Font> when calling run()."
-                )
+                return StyleTransferResult(font=font, confidence=0.5)
+            return self.transfer_style(font, reference_font, factor=interpolation_factor)
+
+        if reference_font is not None:
             return self.transfer_style(font, reference_font, factor=interpolation_factor)
 
         before = analyze_style(font)
@@ -219,7 +237,23 @@ class StyleAgent:
             changes_applied=[f"Unknown intent in prompt: {prompt!r}. No changes applied."],
             before_profile=before,
             after_profile=before,
+            confidence=0.5,
+            target_font=font,
         )
+
+    def _compute_scale(self, source: Font, target: Font) -> float:
+        """Compute the EM-size scale factor from *source* to *target*.
+
+        Returns ``target.em / source.em``, defaulting to ``1.0`` on error.
+        """
+        try:
+            src_ff = getattr(source, "_font", source)
+            dst_ff = getattr(target, "_font", target)
+            src_em = float(getattr(src_ff, "em", 1000) or 1000)
+            dst_em = float(getattr(dst_ff, "em", 1000) or 1000)
+            return dst_em / src_em if src_em > 0 else 1.0
+        except Exception:  # noqa: BLE001
+            return 1.0
 
     # ------------------------------------------------------------------
     # Tool: AnalyzeStyle

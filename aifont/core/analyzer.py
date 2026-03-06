@@ -32,6 +32,8 @@ class GlyphIssue:
         description: Human-readable description of the problem.
         severity:    One of ``"info"``, ``"warning"``, ``"error"``.
         code:        Alias for ``issue_type``.
+        suggestion:  Optional suggestion for fixing the issue.
+        auto_fixable: Whether the issue can be auto-fixed.
     """
 
     glyph_name: str
@@ -39,6 +41,8 @@ class GlyphIssue:
     description: str = ""
     severity: str = "warning"
     code: str = ""
+    suggestion: str = ""
+    auto_fixable: bool = False
 
     def __post_init__(self) -> None:
         if self.code and not self.issue_type:
@@ -70,28 +74,20 @@ class FontReport:
     family_name: str = ""
     missing_basic_latin: list[int] = field(default_factory=list)
     validation_score: float = 0.0
+    # Alias fields accepted in __init__ for backward compatibility
+    coverage_score: float | None = field(default=None, repr=False)
+    missing_unicode: list[str] | None = field(default=None, repr=False)
 
-    # ------------------------------------------------------------------
-    # Compatibility aliases
-    # ------------------------------------------------------------------
-
-    @property
-    def coverage_score(self) -> float:
-        """Alias for :attr:`unicode_coverage`."""
-        return self.unicode_coverage
-
-    @coverage_score.setter
-    def coverage_score(self, value: float) -> None:
-        self.unicode_coverage = value
-
-    @property
-    def missing_unicode(self) -> list[str]:
-        """Alias for :attr:`missing_unicodes`."""
-        return self.missing_unicodes
-
-    @missing_unicode.setter
-    def missing_unicode(self, value: list[str]) -> None:
-        self.missing_unicodes = value
+    def __post_init__(self) -> None:
+        # Apply alias → primary field mapping
+        if self.coverage_score is not None:
+            self.unicode_coverage = self.coverage_score
+        else:
+            self.coverage_score = self.unicode_coverage
+        if self.missing_unicode is not None:
+            self.missing_unicodes = self.missing_unicode
+        else:
+            self.missing_unicode = self.missing_unicodes
 
     # ------------------------------------------------------------------
     # Computed properties
@@ -135,6 +131,96 @@ class FontReport:
         if self.validation_score:
             lines.append(f"  Score           : {self.validation_score:.2f}")
         return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# StyleProfile — lightweight font style snapshot
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StyleProfile:
+    """A lightweight snapshot of a font's visual style attributes.
+
+    Used by :class:`~aifont.agents.style_agent.StyleAgent` to capture the
+    style *before* and *after* a transfer operation.
+
+    Attributes:
+        stroke_width:  Estimated average stroke width in font units.
+        italic_angle:  Italic angle in degrees (0 = upright).
+        weight:        Estimated weight value (100–900).
+        x_height:      x-height in font units (0 if unknown).
+        cap_height:    Cap-height in font units (0 if unknown).
+        style_name:    Descriptive style label derived from the font metadata.
+    """
+
+    stroke_width: float = 0.0
+    italic_angle: float = 0.0
+    weight: float = 400.0
+    x_height: float = 0.0
+    cap_height: float = 0.0
+    style_name: str = ""
+
+    def summary(self) -> str:
+        """Return a one-line human-readable summary."""
+        return (
+            f"style={self.style_name!r} weight={self.weight:.0f}"
+            f" stroke={self.stroke_width:.1f} angle={self.italic_angle:.1f}°"
+        )
+
+
+def analyze_style(font: object) -> StyleProfile:
+    """Extract a :class:`StyleProfile` from *font*.
+
+    Reads italic angle, weight, and typographic metrics from the font's
+    ``fontforge`` object.  Falls back gracefully when attributes are absent.
+
+    Args:
+        font: A :class:`~aifont.core.font.Font` wrapper or raw fontforge font.
+
+    Returns:
+        A :class:`StyleProfile` populated from the font's metadata.
+    """
+    ff = _get_ff_font(font)
+
+    italic_angle: float = 0.0
+    with contextlib.suppress(Exception):
+        italic_angle = float(getattr(ff, "italicangle", 0) or 0)
+
+    weight: float = 400.0
+    with contextlib.suppress(Exception):
+        os2 = getattr(ff, "os2_weight", None)
+        if os2:
+            weight = float(os2)
+
+    x_height: float = 0.0
+    cap_height: float = 0.0
+    metrics = _estimate_metrics(ff)
+    x_height = float(metrics.get("x_height", 0.0))
+    cap_height = float(metrics.get("cap_height", 0.0))
+
+    # Estimate stroke width from the 'I' or 'l' glyph
+    stroke_width: float = 0.0
+    with contextlib.suppress(Exception):
+        for gname in ("I", "l", "H"):
+            g = ff[gname]  # type: ignore[index]
+            bb = g.boundingBox()
+            if bb and bb[2] > bb[0]:
+                stroke_width = float(bb[2] - bb[0])
+                break
+
+    style_name: str = ""
+    with contextlib.suppress(Exception):
+        style_name = str(getattr(ff, "weight", "") or "")
+
+    return StyleProfile(
+        stroke_width=stroke_width,
+        italic_angle=italic_angle,
+        weight=weight,
+        x_height=x_height,
+        cap_height=cap_height,
+        style_name=style_name,
+    )
 
 
 # ---------------------------------------------------------------------------

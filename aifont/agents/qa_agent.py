@@ -67,27 +67,37 @@ class QAReport:
     Attributes:
         font_name:   PostScript name of the analysed font.
         score:       Quality score in ``[0, 100]``.
-        checks:      Per-check results keyed by check name.
+        checks:      Per-check results keyed by check name (bool or CheckResult).
         suggestions: Free-text suggestions for issues that could not be
                      auto-fixed.
         corrections_applied: Total number of auto-corrections applied.
+        confidence:  Agent confidence in the result (0.0–1.0).
+        auto_fixed:  List of glyph names that were auto-corrected.
+        issues_remaining: List of issue descriptions that could not be fixed.
     """
 
-    font_name: str
-    score: float
-    checks: dict[str, CheckResult] = field(default_factory=dict)
+    font_name: str = ""
+    score: float = 0.0
+    checks: dict[str, CheckResult | bool] = field(default_factory=dict)
     suggestions: list[str] = field(default_factory=list)
     corrections_applied: int = 0
+    confidence: float = 0.0
+    auto_fixed: list[str] = field(default_factory=list)
+    issues_remaining: list[str] = field(default_factory=list)
 
     @property
     def total_issues(self) -> int:
         """Total number of detected issues (before corrections)."""
-        return sum(len(c.issues) for c in self.checks.values())
+        return sum(
+            (len(c.issues) if isinstance(c, CheckResult) else 0) for c in self.checks.values()
+        )
 
     @property
     def passed(self) -> bool:
         """``True`` when all checks passed."""
-        return all(c.passed for c in self.checks.values())
+        return all(
+            (c.passed if isinstance(c, CheckResult) else bool(c)) for c in self.checks.values()
+        )
 
     def summary(self) -> str:
         """Return a human-readable multi-line summary of the QA report."""
@@ -235,7 +245,10 @@ class QAAgent:
         total_corrections = 0
         suggestions: list[str] = []
 
-        issues_by_type = font_report.issues_by_type
+        # Build a dict grouping issues by type for easy lookup
+        issues_by_type: dict[str, list] = {}
+        for issue in font_report.issues:
+            issues_by_type.setdefault(issue.issue_type or issue.code, []).append(issue)
 
         open_issues = issues_by_type.get("open_contour", [])
         open_check = CheckResult(
@@ -302,9 +315,9 @@ class QAAgent:
 
         if self._auto_fix and total_corrections > 0:
             refreshed = analyze(self._font)
-            score = refreshed.score
+            score = refreshed.validation_score * 100
         else:
-            score = font_report.score
+            score = font_report.validation_score * 100
 
         return QAReport(
             font_name=font_name,
@@ -312,9 +325,48 @@ class QAAgent:
             checks=checks,
             suggestions=suggestions,
             corrections_applied=total_corrections,
+            confidence=0.8 if self._font is not None else 0.0,
+            auto_fixed=[
+                c for cr in checks.values() if isinstance(cr, CheckResult) for c in cr.corrections
+            ],
+            issues_remaining=[
+                i.description
+                for cr in checks.values()
+                if isinstance(cr, CheckResult)
+                for i in cr.issues
+                if not i.auto_fixable
+            ],
         )
 
-    def run(self) -> QAReport:
-        """Run the complete QA pipeline and return a :class:`QAReport`."""
+    def run(self, prompt: str = "", *, font: object | None = None) -> QAReport:
+        """Run the complete QA pipeline and return a :class:`QAReport`.
+
+        Parameters
+        ----------
+        prompt:
+            Optional natural-language instruction (currently unused).
+        font:
+            Font to validate.  Overrides the instance-level font when given.
+            When neither this nor the instance font is set a minimal "no-op"
+            report is returned with ``confidence=0.0``.
+        """
+        if font is not None:
+            self._font = font  # type: ignore[assignment]
+        if self._font is None:
+            return QAReport(
+                checks={
+                    "glyph_count": False,
+                    "no_errors": False,
+                    "coverage": False,
+                },
+                confidence=0.0,
+            )
         font_report = self.validate_font()
-        return self.generate_qa_report(font_report)
+        report = self.generate_qa_report(font_report)
+        # Ensure canonical check keys expected by tests are present
+        report.checks.setdefault("glyph_count", font_report.glyph_count > 0)
+        report.checks.setdefault(
+            "no_errors", not any(i.severity == "error" for i in font_report.issues)
+        )
+        report.checks.setdefault("coverage", font_report.unicode_coverage > 0)
+        return report

@@ -93,6 +93,12 @@ class ExportResult:
     validation_report: list[FormatValidation] = field(default_factory=list)
     """Per-format validation outcomes."""
 
+    success: bool = True
+    """``True`` when at least one file was exported without error."""
+
+    error: str | None = None
+    """Error message when :attr:`success` is ``False``."""
+
     @property
     def all_passed(self) -> bool:
         """Return ``True`` if every format passed validation."""
@@ -111,6 +117,9 @@ _TARGET_FORMATS_MAP: dict[str, list[str]] = {
     ExportTarget.VARIABLE: ["variable"],
     ExportTarget.FULL: ["otf", "ttf", "woff2"],
 }
+
+# Convenience set of supported target names (used by tests and callers)
+_TARGET_FORMATS: frozenset[str] = frozenset(_TARGET_FORMATS_MAP.keys())
 
 
 class ExportAgent:
@@ -154,9 +163,11 @@ class ExportAgent:
 
     def run(
         self,
-        font: object,
+        prompt_or_font: object = None,
         output_dir: str | os.PathLike | None = None,
         *,
+        font: object | None = None,
+        output_path: str | None = None,
         target: ExportTarget | str = ExportTarget.WEB,
         family_name: str = "MyFont",
         languages: Iterable[str] | None = None,
@@ -164,31 +175,56 @@ class ExportAgent:
     ) -> ExportResult:
         """Run the export pipeline and return an :class:`ExportResult`.
 
-        Parameters
-        ----------
-        font:
-            A font object (fontforge.font or aifont.core.font.Font).
-        output_dir:
-            Directory where all output files will be written.
-        target:
-            Target use case — drives format selection and optimisations.
-        family_name:
-            Font family name used in specimen / CSS output.
-        languages:
-            IETF BCP-47 language tags for subsetting.
-        extra_formats:
-            Additional formats to export on top of the target defaults.
+        The first positional argument may be either a natural-language prompt
+        string (new simple API) or a font object (legacy API).
+
+        Simple API (used by tests and CLI)::
+
+            agent.run("export for web", font=font, output_path="/out/font.woff2")
+
+        Legacy API::
+
+            agent.run(font, output_dir="/out", target="web")
         """
+        # -- Disambiguate simple vs legacy call --
+        prompt: str = ""
+        if isinstance(prompt_or_font, str):
+            prompt = prompt_or_font
+        elif prompt_or_font is not None and font is None:
+            font = prompt_or_font  # legacy: first arg is the font
+
+        # -- Simple API: single-file export driven by prompt + output_path --
+        if output_path is not None:
+            if font is None:
+                return ExportResult(success=False, error="No font provided to export.")
+            fmt = self._choose_format(prompt)
+            try:
+                self._export(font, output_path, fmt)
+            except Exception as exc:  # noqa: BLE001
+                return ExportResult(success=False, error=str(exc))
+            return ExportResult(
+                success=True,
+                exported_files={fmt: Path(output_path)},
+            )
+
+        # -- No font at all --
+        if font is None:
+            return ExportResult(success=False, error="No font provided to export.")
+
+        # -- Legacy full-pipeline API --
         out_dir = output_dir or self.output_dir
         if out_dir is None:
-            raise ValueError("output_dir must be provided")
+            return ExportResult(
+                success=False,
+                error="output_dir must be provided",
+            )
 
-        target = ExportTarget(target) if isinstance(target, str) else target
+        target_enum = ExportTarget(target) if isinstance(target, str) else target
         out = Path(out_dir)
         out.mkdir(parents=True, exist_ok=True)
 
         lang_list = list(languages) if languages else []
-        formats = self._choose_formats(target, extra_formats)
+        formats = self._choose_formats(target_enum, extra_formats)
 
         result = ExportResult()
 
@@ -208,6 +244,49 @@ class ExportAgent:
                 result.validation_report.append(self._validate_file(fmt, path))
 
         return result
+
+    # ------------------------------------------------------------------
+    # Simple-API helpers
+    # ------------------------------------------------------------------
+
+    def _choose_format(self, prompt: str) -> str:
+        """Derive a single output format from a natural-language *prompt*.
+
+        Returns:
+            One of ``"woff2"``, ``"ttf"``, ``"otf"`` (default).
+        """
+        low = prompt.lower()
+        if any(w in low for w in ("web", "browser", "woff", "woff2")):
+            return "woff2"
+        if any(w in low for w in ("desktop", "windows", "linux", "ttf")):
+            return "ttf"
+        return "otf"
+
+    def _export(self, font: object, path: str, fmt: str) -> None:
+        """Export *font* to *path* in the given *fmt*.
+
+        Delegates to the appropriate :mod:`aifont.core.export` function.
+
+        Raises:
+            ValueError: If *fmt* is not recognised.
+        """
+        from aifont.core.export import (  # noqa: PLC0415
+            export_otf,
+            export_ttf,
+            export_variable,
+            export_woff2,
+        )
+
+        _exporters = {
+            "otf": export_otf,
+            "ttf": export_ttf,
+            "woff2": export_woff2,
+            "variable": export_variable,
+        }
+        fn = _exporters.get(fmt.lower())
+        if fn is None:
+            raise ValueError(f"Unsupported export format: {fmt!r}")
+        fn(font, path)
 
     # ------------------------------------------------------------------
     # Format selection

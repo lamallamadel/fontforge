@@ -6,6 +6,7 @@ FontForge source code is never modified.
 
 from __future__ import annotations
 
+import contextlib
 import statistics
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -55,6 +56,14 @@ class SpacingAnalysis:
     mean_left_bearing: float = 0.0
     mean_right_bearing: float = 0.0
     kern_pairs: dict[tuple[str, str], int] = field(default_factory=dict)
+    inconsistent_pairs: list[tuple[str, str]] = field(default_factory=list)
+    # Extended statistics used by MetricsAgent
+    glyph_count: int = 0
+    kern_pair_count: int = 0
+    avg_lsb: float = 0.0
+    avg_rsb: float = 0.0
+    outlier_sidebearings: list[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +217,96 @@ def auto_space(font: object, target_ratio: float = 0.15) -> None:
         pass
 
 
+def get_side_bearings(font: object, glyph_name: str) -> SideBearings | None:
+    """Return the side-bearings for a single glyph.
+
+    Args:
+        font:       Font wrapper or raw fontforge font.
+        glyph_name: Name of the glyph to query.
+
+    Returns:
+        A :class:`SideBearings` if the glyph exists, ``None`` otherwise.
+    """
+    ff = _get_ff_font(font)
+    try:
+        g = ff[glyph_name]  # type: ignore[index]
+        return SideBearings(
+            left=int(getattr(g, "left_side_bearing", 0)),
+            right=int(getattr(g, "right_side_bearing", 0)),
+        )
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def set_side_bearings(
+    font: object,
+    glyph_name: str,
+    *,
+    lsb: int | None = None,
+    rsb: int | None = None,
+) -> bool:
+    """Set the left and/or right side-bearing of a glyph.
+
+    Args:
+        font:       Font wrapper or raw fontforge font.
+        glyph_name: Name of the glyph to modify.
+        lsb:        New left side-bearing (``None`` = leave unchanged).
+        rsb:        New right side-bearing (``None`` = leave unchanged).
+
+    Returns:
+        ``True`` if the glyph was found and updated, ``False`` otherwise.
+    """
+    ff = _get_ff_font(font)
+    try:
+        g = ff[glyph_name]  # type: ignore[index]
+        if lsb is not None:
+            g.left_side_bearing = lsb  # type: ignore[attr-defined]
+        if rsb is not None:
+            g.right_side_bearing = rsb  # type: ignore[attr-defined]
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def auto_kern(
+    font: object,
+    threshold: int = 10,
+) -> list[KernPair]:
+    """Automatically generate kern pairs for glyphs that are spaced too tightly.
+
+    Iterates over all glyph pairs in *font*, reads existing kern values from
+    ``getPosSub`` and returns every pair whose absolute kern value exceeds
+    *threshold* as a :class:`KernPair`.
+
+    When the fontforge ``autoKern`` API is available it is preferred; otherwise
+    the function falls back to reading the current kern table via
+    :func:`get_kern_pairs`.
+
+    Args:
+        font:      Font wrapper or raw fontforge font.
+        threshold: Minimum absolute kern value to include in the result.
+                   Pairs with ``|value| <= threshold`` are considered noise
+                   and omitted.
+
+    Returns:
+        List of :class:`KernPair` objects sorted by descending absolute value.
+    """
+    ff = _get_ff_font(font)
+
+    # Try fontforge's native autoKern
+    with contextlib.suppress(Exception):
+        ff.autoKern(_KERN_SUBTABLE_NAME, 0)  # type: ignore[union-attr]
+
+    raw = get_kern_pairs(font)
+    pairs = [
+        KernPair(left=left, right=right, value=v)
+        for (left, right), v in raw.items()
+        if abs(v) > threshold
+    ]
+    pairs.sort(key=lambda p: abs(p.value), reverse=True)
+    return pairs
+
+
 def analyze_spacing(font: object) -> SpacingAnalysis:
     """Collect side-bearing statistics for all glyphs.
 
@@ -230,7 +329,11 @@ def analyze_spacing(font: object) -> SpacingAnalysis:
         pass
     if left_vals:
         analysis.mean_left_bearing = statistics.mean(left_vals)
+        analysis.avg_lsb = analysis.mean_left_bearing
     if right_vals:
         analysis.mean_right_bearing = statistics.mean(right_vals)
+        analysis.avg_rsb = analysis.mean_right_bearing
     analysis.kern_pairs = get_kern_pairs(font)
+    analysis.kern_pair_count = len(analysis.kern_pairs)
+    analysis.glyph_count = len(analysis.sidebearings)
     return analysis

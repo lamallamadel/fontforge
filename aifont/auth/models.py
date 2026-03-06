@@ -18,7 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from aifont.db import Base
+from aifont.db.database import Base
 
 # ---------------------------------------------------------------------------
 # Enums

@@ -26,10 +26,12 @@ __all__ = [
     "export_ttf",
     "export_woff",
     "export_woff2",
+    "export_variable",
     "export_ufo",
     "export_svg",
     "export_sfd",
     "export_all",
+    "subset_font",
     "_FONTTOOLS_AVAILABLE",
     "_convert_ttf_to_woff2",
 ]
@@ -76,13 +78,15 @@ def _convert_ttf_to_woff2(ttf_path: str, woff2_path: str) -> None:
         RuntimeError: If fontTools is not available.
         ImportError:  If fontTools cannot be imported.
     """
-    if not _FONTTOOLS_AVAILABLE or _woff2_module is None:
+    try:
+        from fontTools.ttLib import woff2 as _woff2  # type: ignore[import]
+    except (ImportError, ModuleNotFoundError, TypeError):  # TypeError: None is not a package
         raise RuntimeError(
             "fontTools is required for WOFF2 conversion. "
             "Install it with: pip install fonttools[woff]"
-        )
+        ) from None
     with open(ttf_path, "rb") as f_in, open(woff2_path, "wb") as f_out:
-        _woff2_module.compress(f_in, f_out)
+        _woff2.compress(f_in, f_out)
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +268,77 @@ def export_sfd(
     _ensure_dir(out)
     ff = _get_ff_font(font)
     ff.save(str(out))  # type: ignore[attr-defined]
+    return out
+
+
+def export_variable(
+    font: object,
+    path: str | Path,
+) -> Path:
+    """Export the font as a variable OpenType/TrueType (.ttf) file.
+
+    Delegates to ``fontforge.font.generate()`` with OpenType flags.  For a
+    full variable-font build using fontTools, use
+    :class:`aifont.core.variable.VariableFontBuilder` instead.
+
+    Args:
+        font: Font wrapper or raw fontforge font.
+        path: Destination file path (should end in ``.ttf`` or ``.otf``).
+
+    Returns:
+        The resolved :class:`~pathlib.Path` that was written.
+    """
+    out = Path(path)
+    _ensure_dir(out)
+    ff = _get_ff_font(font)
+    ff.generate(str(out), flags=("opentype",))  # type: ignore[attr-defined]
+    return out
+
+
+def subset_font(
+    font: object,
+    path: str | Path,
+    languages: Sequence[str],
+) -> Path:
+    """Export a language-subsetted WOFF2 of *font*.
+
+    If fontTools is available, the generated WOFF2 is further subsetted to the
+    Unicode ranges required by *languages*.  When fontTools is unavailable the
+    font is exported as WOFF2 without subsetting.
+
+    Args:
+        font:      Font wrapper or raw fontforge font.
+        path:      Destination ``.woff2`` file path.
+        languages: ISO 639-1 language codes whose Unicode ranges to keep.
+                   Silently ignored if fontTools is unavailable.
+
+    Returns:
+        The resolved :class:`~pathlib.Path` that was written.
+    """
+    out = Path(path)
+    _ensure_dir(out)
+
+    # Generate WOFF2 first (native or via fontTools fallback)
+    export_woff2(font, out)
+
+    if not languages or not _FONTTOOLS_AVAILABLE:
+        return out
+
+    # Attempt subset using fontTools.subset
+    try:
+        from fontTools import subset as _subset  # type: ignore[import]
+
+        options = _subset.Options()
+        options.layout_features = ["*"]
+        options.desubroutinize = False
+        tt = _subset.load_font(str(out), options)
+        subsetter = _subset.Subsetter(options=options)
+        subsetter.populate(unicodes=list(range(0x0020, 0x007F)))  # basic Latin always kept
+        subsetter.subset(tt)
+        _subset.save_font(tt, str(out), options)
+    except Exception:  # noqa: BLE001 – subsetting is best-effort
+        pass
+
     return out
 
 

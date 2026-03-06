@@ -81,6 +81,10 @@ class QuotaExceededError(Exception):
         super().__init__(detail)
 
 
+#: Alias for :class:`QuotaExceededError` (backward-compatible name).
+QuotaExceeded = QuotaExceededError
+
+
 async def check_export_quota(user: User, db: AsyncSession) -> None:
     """Raise QuotaExceeded if the user has exhausted their daily export quota."""
     quota = await get_or_create_quota(user, db)
