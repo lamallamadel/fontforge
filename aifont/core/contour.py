@@ -26,6 +26,7 @@ apply_slant(glyph, angle_deg, x_origin)
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Sequence
 from collections.abc import Sequence
 """
 aifont.core.contour — Bézier curve and path manipulation utilities.
@@ -232,6 +233,19 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from aifont.core.glyph import Glyph
 
+
+def simplify(glyph: "Glyph", threshold: float = 1.0) -> None:
+    """Simplify a glyph's contours by removing redundant points.
+
+    Args:
+        glyph:     The glyph to simplify.
+        threshold: Maximum distance for point removal (default 1.0).
+
+    Raises:
+        RuntimeError: If the glyph is not properly initialized.
+    """
+    if glyph._ff is None:
+        raise RuntimeError("Glyph is not properly initialized.")
 # 2-D transformation matrix type: ((xx, xy), (yx, yy)) or a flat 6-element tuple.
 Matrix = Sequence[float]
 
@@ -292,6 +306,50 @@ def simplify(glyph: "Glyph", threshold: float = 1.0) -> None:
 
 
 def remove_overlap(glyph: "Glyph") -> None:
+    """Remove overlapping paths in a glyph.
+
+    Args:
+        glyph: The glyph to process.
+
+    Raises:
+        RuntimeError: If the glyph is not properly initialized.
+    """
+    if glyph._ff is None:
+        raise RuntimeError("Glyph is not properly initialized.")
+    glyph._ff.removeOverlap()
+
+
+def transform(glyph: "Glyph", matrix: Sequence[float]) -> None:
+    """Apply an affine transformation matrix to a glyph.
+
+    Args:
+        glyph:  The glyph to transform.
+        matrix: A 6-element affine matrix ``[xx, xy, yx, yy, dx, dy]``.
+
+    Example:
+        Scale by 50%::
+
+            transform(glyph, [0.5, 0, 0, 0.5, 0, 0])
+    """
+    if len(matrix) != 6:
+        raise ValueError("Matrix must have exactly 6 elements [xx, xy, yx, yy, dx, dy].")
+    if glyph._ff is None:
+        raise RuntimeError("Glyph is not properly initialized.")
+    glyph._ff.transform(tuple(matrix))
+
+
+def reverse_direction(glyph: "Glyph") -> None:
+    """Reverse the winding direction of all contours in a glyph.
+
+    Args:
+        glyph: The glyph to process.
+
+    Raises:
+        RuntimeError: If the glyph is not properly initialized.
+    """
+    if glyph._ff is None:
+        raise RuntimeError("Glyph is not properly initialized.")
+    glyph._ff.reverseDirection()
     """Remove overlapping path regions from *glyph*.
 
     Applies fontforge's ``removeOverlap`` to merge intersecting contours into

@@ -1,3 +1,5 @@
+defusedxml>=0.7.1
+fonttools>=4.0.0
 # AIFont platform dependencies
 # Install with: pip install -r aifont/requirements.txt
 
