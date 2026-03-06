@@ -1,0 +1,113 @@
+# ---------------------------------------------------------------------------
+# Alertmanager configuration — routing and notification channels
+# ---------------------------------------------------------------------------
+# Replace the placeholder values (Slack webhook URL, SMTP credentials, etc.)
+# with real values from environment variables or a secrets manager.
+# ---------------------------------------------------------------------------
+
+global:
+  resolve_timeout: 5m
+
+  # SMTP settings for email notifications (optional)
+  smtp_smarthost: "${ALERTMANAGER_SMTP_HOST:-smtp.example.com:587}"
+  smtp_from: "alertmanager@example.com"
+  smtp_auth_username: "${ALERTMANAGER_SMTP_USER:-}"
+  smtp_auth_password: "${ALERTMANAGER_SMTP_PASSWORD:-}"
+  smtp_require_tls: true
+
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+
+# ---------------------------------------------------------------------------
+# Routing tree
+# ---------------------------------------------------------------------------
+route:
+  receiver: "default"
+  group_by: ["alertname", "service", "severity"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Critical alerts — immediate page
+    - matchers:
+        - severity="critical"
+      receiver: "critical-pagerduty"
+      repeat_interval: 1h
+      continue: true           # also send to default Slack channel
+
+    # Warning alerts — Slack only
+    - matchers:
+        - severity="warning"
+      receiver: "slack-warnings"
+      repeat_interval: 4h
+
+    # AI team-specific alerts
+    - matchers:
+        - team="ai"
+      receiver: "slack-ai-team"
+      group_by: ["alertname", "agent_name"]
+
+# ---------------------------------------------------------------------------
+# Receivers
+# ---------------------------------------------------------------------------
+receivers:
+
+  - name: "default"
+    slack_configs:
+      - api_url: "${ALERTMANAGER_SLACK_WEBHOOK_URL:-https://hooks.slack.com/services/REPLACE_ME}"
+        channel: "#aifont-alerts"
+        send_resolved: true
+        title: "[{{ .Status | toUpper }}{{ if eq .Status \"firing\" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}"
+        text: >-
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+
+  - name: "slack-warnings"
+    slack_configs:
+      - api_url: "${ALERTMANAGER_SLACK_WEBHOOK_URL:-https://hooks.slack.com/services/REPLACE_ME}"
+        channel: "#aifont-alerts"
+        send_resolved: true
+        title: "⚠️  {{ .CommonLabels.alertname }}"
+        text: >-
+          {{ range .Alerts }}
+          {{ .Annotations.description }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+
+  - name: "slack-ai-team"
+    slack_configs:
+      - api_url: "${ALERTMANAGER_SLACK_AI_WEBHOOK_URL:-https://hooks.slack.com/services/REPLACE_ME}"
+        channel: "#aifont-ai-alerts"
+        send_resolved: true
+        title: "🤖 Agent alert: {{ .CommonLabels.alertname }}"
+        text: >-
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+
+  - name: "critical-pagerduty"
+    pagerduty_configs:
+      - routing_key: "${PAGERDUTY_ROUTING_KEY:-REPLACE_ME}"
+        description: "{{ .CommonAnnotations.summary }}"
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+          runbook: "{{ .CommonAnnotations.runbook_url }}"
+
+# ---------------------------------------------------------------------------
+# Inhibition rules
+# ---------------------------------------------------------------------------
+inhibit_rules:
+  # Suppress warnings when a critical alert is already firing for the same
+  # alertname + service combination.
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: ["alertname", "service"]

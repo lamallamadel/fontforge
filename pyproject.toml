@@ -165,3 +165,7 @@ before-build = "pip install delvewheel"
 
 # Repair wheels with delvewheel, adding vcpkg DLL path
 repair-wheel-command = "delvewheel repair --add-path C:/vcpkg/installed/x64-windows/bin -w {dest_dir} {wheel}"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
