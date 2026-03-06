@@ -9,13 +9,14 @@ FontForge source code is never modified.
 
 from __future__ import annotations
 
+import contextlib
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 try:
     import fontforge  # type: ignore
+
     # Guard against the namespace-package stub that lacks the C extension API.
     if not hasattr(fontforge, "font"):
         fontforge = None  # type: ignore  # C extension not installed
@@ -34,7 +35,7 @@ _SVG_NS = "http://www.w3.org/2000/svg"
 
 def _parse_transform(
     transform_str: str,
-) -> Tuple[float, float, float, float, float, float]:
+) -> tuple[float, float, float, float, float, float]:
     """Parse a simple SVG transform attribute into a 6-tuple affine matrix.
 
     Supported functions: ``translate``, ``scale``, ``matrix``.
@@ -55,9 +56,7 @@ def _parse_transform(
     if not transform_str:
         return a, b, c, d, e, f
 
-    for match in re.finditer(
-        r"(matrix|translate|scale)\s*\(([^)]*)\)", transform_str
-    ):
+    for match in re.finditer(r"(matrix|translate|scale)\s*\(([^)]*)\)", transform_str):
         func = match.group(1)
         args = [float(v) for v in re.split(r"[\s,]+", match.group(2).strip()) if v]
 
@@ -90,8 +89,8 @@ def _parse_transform(
 def _apply_matrix(
     x: float,
     y: float,
-    matrix: Tuple[float, float, float, float, float, float],
-) -> Tuple[float, float]:
+    matrix: tuple[float, float, float, float, float, float],
+) -> tuple[float, float]:
     """Apply a 2-D affine *matrix* to point (*x*, *y*).
 
     Args:
@@ -117,7 +116,7 @@ _PATH_CMD_RE = re.compile(
 )
 
 
-def _tokenise_path(d: str) -> List[object]:
+def _tokenise_path(d: str) -> list[object]:
     """Tokenise an SVG path ``d`` attribute into command letters and floats.
 
     Args:
@@ -127,7 +126,7 @@ def _tokenise_path(d: str) -> List[object]:
         A list where each element is either a command letter (str)
         or a numeric argument (float).
     """
-    tokens: List[object] = []
+    tokens: list[object] = []
     for m in _PATH_CMD_RE.finditer(d):
         if m.group(1):
             tokens.append(m.group(1))
@@ -136,7 +135,7 @@ def _tokenise_path(d: str) -> List[object]:
     return tokens
 
 
-def _parse_path_d(d: str) -> List[Tuple[str, List[float]]]:
+def _parse_path_d(d: str) -> list[tuple[str, list[float]]]:
     """Parse SVG path data into a list of ``(command, [args])`` tuples.
 
     Only absolute commands are returned.  Relative commands are converted
@@ -149,19 +148,26 @@ def _parse_path_d(d: str) -> List[Tuple[str, List[float]]]:
         List of ``(upper_cmd, [args])`` tuples.
     """
     tokens = _tokenise_path(d)
-    commands: List[Tuple[str, List[float]]] = []
+    commands: list[tuple[str, list[float]]] = []
 
     # Number of coordinate arguments expected per command.
     _arg_count = {
-        "M": 2, "L": 2, "H": 1, "V": 1,
-        "C": 6, "S": 4, "Q": 4, "T": 2,
-        "A": 7, "Z": 0,
+        "M": 2,
+        "L": 2,
+        "H": 1,
+        "V": 1,
+        "C": 6,
+        "S": 4,
+        "Q": 4,
+        "T": 2,
+        "A": 7,
+        "Z": 0,
     }
 
     cx, cy = 0.0, 0.0  # current point
     sx, sy = 0.0, 0.0  # subpath start (for Z)
     cmd = ""
-    args: List[float] = []
+    args: list[float] = []
 
     i = 0
     while i < len(tokens):
@@ -205,12 +211,7 @@ def _parse_path_d(d: str) -> List[Tuple[str, List[float]]]:
                 a[3] += cy
                 a[4] += cx
                 a[5] += cy
-            elif upper == "S":
-                a[0] += cx
-                a[1] += cy
-                a[2] += cx
-                a[3] += cy
-            elif upper == "Q":
+            elif upper == "S" or upper == "Q":
                 a[0] += cx
                 a[1] += cy
                 a[2] += cx
@@ -251,7 +252,7 @@ def _flip_y(y: float, em: float = 1000.0) -> float:
 
 def _parse_viewbox(
     vb_str: str,
-) -> Optional[Tuple[float, float, float, float]]:
+) -> tuple[float, float, float, float] | None:
     """Parse an SVG ``viewBox`` attribute string.
 
     Args:
@@ -272,7 +273,7 @@ def _parse_viewbox(
         return None
 
 
-def _collect_path_data(root: "ET.Element") -> List[str]:
+def _collect_path_data(root: ET.Element) -> list[str]:
     """Recursively collect ``d`` attribute strings from all ``<path>`` elements.
 
     Args:
@@ -281,9 +282,9 @@ def _collect_path_data(root: "ET.Element") -> List[str]:
     Returns:
         A list of non-empty ``d`` attribute strings, one per ``<path>``.
     """
-    results: List[str] = []
+    results: list[str] = []
 
-    def _visit(elem: "ET.Element") -> None:
+    def _visit(elem: ET.Element) -> None:
         tag = elem.tag.replace(f"{{{_SVG_NS}}}", "").split("}")[-1]
         if tag == "path":
             d = elem.get("d", "").strip()
@@ -307,7 +308,7 @@ def _get_em(ff_font: object) -> float:
 def _inject_path_into_glyph(
     ff_glyph: object,
     d: str,
-    matrix: Tuple[float, float, float, float, float, float],
+    matrix: tuple[float, float, float, float, float, float],
     em: float = 1000.0,
 ) -> None:
     """Parse SVG path *d* and draw it into *ff_glyph* using a glyph pen."""
@@ -346,10 +347,10 @@ def _inject_path_into_glyph(
 
 
 def svg_to_glyph(
-    svg_path: "str | Path",
+    svg_path: str | Path,
     font: object,
     unicode_point: int = -1,
-    glyph_name: Optional[str] = None,
+    glyph_name: str | None = None,
 ) -> object:
     """Parse an SVG file and load its paths into a new glyph.
 
@@ -424,18 +425,13 @@ def svg_to_glyph(
     paths = _collect_path_data(root)
     if not paths:
         raise ValueError(
-            f"No <path> elements found in SVG {svg_path}. "
-            "Cannot import glyph without path data."
+            f"No <path> elements found in SVG {svg_path}. Cannot import glyph without path data."
         )
 
-    identity: Tuple[float, float, float, float, float, float] = (
-        1.0, 0.0, 0.0, 1.0, 0.0, 0.0
-    )
+    identity: tuple[float, float, float, float, float, float] = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
     for d in paths:
-        try:
+        with contextlib.suppress(Exception):
             _inject_path_into_glyph(ff_glyph, d, identity, em)
-        except Exception:  # noqa: BLE001
-            pass
 
     if vb is not None:
         ff_glyph.width = int(vb[2])
@@ -444,7 +440,7 @@ def svg_to_glyph(
 
 
 # American spelling alias used in some test modules
-def _tokenize_path(d: str) -> List[str]:
+def _tokenize_path(d: str) -> list[str]:
     """Tokenise an SVG path ``d`` string, returning all tokens as strings.
 
     Both command letters and numeric values are returned as strings.
@@ -455,7 +451,7 @@ def _tokenize_path(d: str) -> List[str]:
     Returns:
         A flat list of string tokens.
     """
-    tokens: List[str] = []
+    tokens: list[str] = []
     for m in _PATH_CMD_RE.finditer(d):
         if m.group(1):
             tokens.append(m.group(1))
@@ -467,8 +463,8 @@ def _tokenize_path(d: str) -> List[str]:
 def svg_path_to_contours(
     d: str,
     em: float = 1000.0,
-    matrix: Optional[Tuple[float, float, float, float, float, float]] = None,
-) -> List[List[Tuple[str, List[float]]]]:
+    matrix: tuple[float, float, float, float, float, float] | None = None,
+) -> list[list[tuple[str, list[float]]]]:
     """Parse an SVG path ``d`` string into a list of subpaths.
 
     Each subpath is a list of ``(command, args)`` tuples. Subpaths are
@@ -485,8 +481,8 @@ def svg_path_to_contours(
         ``(upper_cmd, [args])`` tuples.
     """
     all_cmds = _parse_path_d(d)
-    subpaths: List[List[Tuple[str, List[float]]]] = []
-    current: List[Tuple[str, List[float]]] = []
+    subpaths: list[list[tuple[str, list[float]]]] = []
+    current: list[tuple[str, list[float]]] = []
     for cmd, args in all_cmds:
         current.append((cmd, args))
         if cmd == "Z":

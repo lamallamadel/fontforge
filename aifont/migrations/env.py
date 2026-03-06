@@ -13,12 +13,13 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import aifont.db.models  # noqa: F401 — side-effect: populate Base.metadata
+
 # ---------------------------------------------------------------------------
 # Import all models so that Base.metadata is fully populated before Alembic
 # inspects it for autogenerate.
 # ---------------------------------------------------------------------------
 from aifont.db.database import Base  # noqa: F401 — registers metadata
-import aifont.db.models  # noqa: F401 — side-effect: populate Base.metadata
 
 # ---------------------------------------------------------------------------
 # Alembic Config object — provides access to values in alembic.ini

@@ -62,9 +62,7 @@ async def revoke_api_key(key_id: str, user: User, db: AsyncSession) -> bool:
     Returns:
         True if the key was found and revoked, False otherwise.
     """
-    result = await db.execute(
-        select(APIKey).where(APIKey.id == key_id, APIKey.user_id == user.id)
-    )
+    result = await db.execute(select(APIKey).where(APIKey.id == key_id, APIKey.user_id == user.id))
     api_key = result.scalar_one_or_none()
     if api_key is None:
         return False

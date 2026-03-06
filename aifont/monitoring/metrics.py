@@ -19,15 +19,15 @@ from __future__ import annotations
 
 import contextlib
 import time
-from typing import Generator
+from collections.abc import Generator
 
 from prometheus_client import (
+    REGISTRY,
     CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
     Info,
-    REGISTRY,
 )
 
 # ---------------------------------------------------------------------------
@@ -221,9 +221,7 @@ def track_agent_run(agent_name: str) -> Generator[None, None, None]:
         AGENT_RUN_COUNT.labels(agent_name=agent_name, status="success").inc()
     except Exception as exc:
         AGENT_RUN_COUNT.labels(agent_name=agent_name, status="error").inc()
-        AGENT_RUN_ERRORS.labels(
-            agent_name=agent_name, error_type=type(exc).__name__
-        ).inc()
+        AGENT_RUN_ERRORS.labels(agent_name=agent_name, error_type=type(exc).__name__).inc()
         raise
     finally:
         elapsed = time.perf_counter() - start
@@ -248,7 +246,5 @@ def track_font_export(
         if size_bytes > 0:
             FONT_EXPORT_SIZE_BYTES.labels(format=fmt).observe(size_bytes)
     except Exception as exc:
-        FONT_EXPORT_ERRORS.labels(
-            format=fmt, error_type=type(exc).__name__
-        ).inc()
+        FONT_EXPORT_ERRORS.labels(format=fmt, error_type=type(exc).__name__).inc()
         raise

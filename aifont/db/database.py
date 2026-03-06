@@ -1,11 +1,11 @@
 """Database connection and session management for AIFont."""
 
 import os
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 # ---------------------------------------------------------------------------
 # Connection URL

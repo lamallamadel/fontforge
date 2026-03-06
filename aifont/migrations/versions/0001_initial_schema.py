@@ -18,7 +18,7 @@ Revises:
 Create Date: 2025-01-01 00:00:00.000000
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -26,9 +26,9 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -157,9 +157,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.CheckConstraint("char_length(username) >= 3", name="ck_users_username_min_len"),
-        sa.CheckConstraint(
-            "email ~* '^[^@]+@[^@]+\\.[^@]+$'", name="ck_users_email_format"
-        ),
+        sa.CheckConstraint("email ~* '^[^@]+@[^@]+\\.[^@]+$'", name="ck_users_email_format"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email", name="uq_users_email"),
         sa.UniqueConstraint("username", name="uq_users_username"),
@@ -210,12 +208,8 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "ix_font_projects_user_id", "font_projects", ["user_id"], unique=False
-    )
-    op.create_index(
-        "ix_font_projects_status", "font_projects", ["status"], unique=False
-    )
+    op.create_index("ix_font_projects_user_id", "font_projects", ["user_id"], unique=False)
+    op.create_index("ix_font_projects_status", "font_projects", ["status"], unique=False)
 
     # ------------------------------------------------------------------
     # fonts
@@ -259,12 +253,8 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "weight >= 100 AND weight <= 900", name="ck_fonts_weight_range"
-        ),
-        sa.CheckConstraint(
-            "glyph_count >= 0", name="ck_fonts_glyph_count_non_negative"
-        ),
+        sa.CheckConstraint("weight >= 100 AND weight <= 900", name="ck_fonts_weight_range"),
+        sa.CheckConstraint("glyph_count >= 0", name="ck_fonts_glyph_count_non_negative"),
         sa.ForeignKeyConstraint(
             ["project_id"],
             ["font_projects.id"],
@@ -311,9 +301,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "advance_width >= 0", name="ck_glyphs_advance_width_non_negative"
-        ),
+        sa.CheckConstraint("advance_width >= 0", name="ck_glyphs_advance_width_non_negative"),
         sa.ForeignKeyConstraint(
             ["font_id"],
             ["fonts.id"],
@@ -322,9 +310,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("font_id", "name", name="uq_glyphs_font_name"),
-        sa.UniqueConstraint(
-            "font_id", "unicode_codepoint", name="uq_glyphs_font_codepoint"
-        ),
+        sa.UniqueConstraint("font_id", "unicode_codepoint", name="uq_glyphs_font_codepoint"),
     )
     op.create_index("ix_glyphs_font_id", "glyphs", ["font_id"], unique=False)
     op.create_index(
@@ -501,9 +487,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_agent_tasks_run_id", "agent_tasks", ["run_id"], unique=False)
-    op.create_index(
-        "ix_agent_tasks_agent_type", "agent_tasks", ["agent_type"], unique=False
-    )
+    op.create_index("ix_agent_tasks_agent_type", "agent_tasks", ["agent_type"], unique=False)
     op.create_index("ix_agent_tasks_status", "agent_tasks", ["status"], unique=False)
 
     # ------------------------------------------------------------------

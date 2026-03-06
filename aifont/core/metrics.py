@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from aifont.core.font import Font
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -51,10 +51,10 @@ class SideBearings:
 class SpacingAnalysis:
     """Aggregate spacing statistics for a font."""
 
-    sidebearings: Dict[str, SideBearings] = field(default_factory=dict)
+    sidebearings: dict[str, SideBearings] = field(default_factory=dict)
     mean_left_bearing: float = 0.0
     mean_right_bearing: float = 0.0
-    kern_pairs: Dict[Tuple[str, str], int] = field(default_factory=dict)
+    kern_pairs: dict[tuple[str, str], int] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ def _get_ff_font(font_or_ff: object) -> object:
 # ---------------------------------------------------------------------------
 
 
-def get_kern_pairs(font: object) -> Dict[Tuple[str, str], int]:
+def get_kern_pairs(font: object) -> dict[tuple[str, str], int]:
     """Return all kern pairs defined in *font* as a dict.
 
     Args:
@@ -87,7 +87,7 @@ def get_kern_pairs(font: object) -> Dict[Tuple[str, str], int]:
         A dict mapping ``(left_glyph, right_glyph)`` → kern value.
     """
     ff = _get_ff_font(font)
-    pairs: Dict[Tuple[str, str], int] = {}
+    pairs: dict[tuple[str, str], int] = {}
 
     # If no subtables configured, return empty dict quickly
     subtables = getattr(ff, "subtables", None)
@@ -120,8 +120,8 @@ def set_kern(
     left: str,
     right: str,
     value: int,
-    lookup: Optional[str] = None,
-    subtable: Optional[str] = None,
+    lookup: str | None = None,
+    subtable: str | None = None,
 ) -> None:
     """Add or update a kern pair.
 
@@ -141,7 +141,7 @@ def set_kern(
     try:
         gpos_lookups = getattr(ff, "gpos_lookups", None)
         if gpos_lookups is None:
-            existing: List[str] = []
+            existing: list[str] = []
         else:
             try:
                 existing = list(gpos_lookups)
@@ -216,8 +216,8 @@ def analyze_spacing(font: object) -> SpacingAnalysis:
     """
     ff = _get_ff_font(font)
     analysis = SpacingAnalysis()
-    left_vals: List[int] = []
-    right_vals: List[int] = []
+    left_vals: list[int] = []
+    right_vals: list[int] = []
     try:
         for glyph_name in ff:  # type: ignore[union-attr]
             g = ff[glyph_name]  # type: ignore[index]

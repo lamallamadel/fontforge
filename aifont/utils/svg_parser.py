@@ -6,12 +6,12 @@ so that users can import from ``aifont.utils`` as documented.
 """
 
 from aifont.core.svg_parser import (  # noqa: F401
-    svg_to_glyph,
-    svg_path_to_contours,
-    _parse_transform,
     _apply_matrix,
-    _tokenise_path,
     _parse_path_d,
+    _parse_transform,
+    _tokenise_path,
+    svg_path_to_contours,
+    svg_to_glyph,
 )
 
 __all__ = [

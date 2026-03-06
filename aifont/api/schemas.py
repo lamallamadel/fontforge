@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
-
 
 # ------------------------------------------------------------------ #
 # Auth                                                                 #
@@ -35,7 +33,7 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    sub: Optional[str] = None
+    sub: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -50,10 +48,10 @@ class LoginRequest(BaseModel):
 
 class FontCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=256)
-    family: Optional[str] = Field(None, max_length=256)
-    style: Optional[str] = Field(None, max_length=128)
-    version: Optional[str] = Field(None, max_length=64)
-    description: Optional[str] = Field(None, max_length=4096)
+    family: str | None = Field(None, max_length=256)
+    style: str | None = Field(None, max_length=128)
+    version: str | None = Field(None, max_length=64)
+    description: str | None = Field(None, max_length=4096)
 
     @field_validator("name")
     @classmethod
@@ -64,25 +62,25 @@ class FontCreate(BaseModel):
 
 
 class FontUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=256)
-    family: Optional[str] = Field(None, max_length=256)
-    style: Optional[str] = Field(None, max_length=128)
-    version: Optional[str] = Field(None, max_length=64)
-    description: Optional[str] = Field(None, max_length=4096)
+    name: str | None = Field(None, min_length=1, max_length=256)
+    family: str | None = Field(None, max_length=256)
+    style: str | None = Field(None, max_length=128)
+    version: str | None = Field(None, max_length=64)
+    description: str | None = Field(None, max_length=4096)
 
 
 class FontRead(BaseModel):
     id: uuid.UUID
     name: str
-    family: Optional[str]
-    style: Optional[str]
-    version: Optional[str]
-    description: Optional[str]
-    file_path: Optional[str]
-    glyph_count: Optional[int]
+    family: str | None
+    style: str | None
+    version: str | None
+    description: str | None
+    file_path: str | None
+    glyph_count: int | None
     created_at: datetime
     updated_at: datetime
-    owner_id: Optional[uuid.UUID]
+    owner_id: uuid.UUID | None
 
     model_config = {"from_attributes": True}
 
@@ -101,15 +99,15 @@ class FontList(BaseModel):
 
 class GenerationRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2048)
-    font_id: Optional[uuid.UUID] = None
-    style_hints: Optional[dict] = None
+    font_id: uuid.UUID | None = None
+    style_hints: dict | None = None
 
 
 class TaskStatus(BaseModel):
     task_id: str
     status: str
-    result: Optional[dict] = None
-    error: Optional[str] = None
+    result: dict | None = None
+    error: str | None = None
 
 
 # ------------------------------------------------------------------ #
@@ -120,8 +118,8 @@ class TaskStatus(BaseModel):
 class AgentRunRequest(BaseModel):
     agent: str = Field(..., min_length=1, max_length=64)
     prompt: str = Field(..., min_length=1, max_length=4096)
-    font_id: Optional[uuid.UUID] = None
-    parameters: Optional[dict] = None
+    font_id: uuid.UUID | None = None
+    parameters: dict | None = None
 
     @field_validator("agent")
     @classmethod
@@ -146,9 +144,9 @@ class AgentRunResponse(BaseModel):
 class AnalysisResultRead(BaseModel):
     id: uuid.UUID
     font_id: uuid.UUID
-    task_id: Optional[str]
+    task_id: str | None
     status: str
-    result: Optional[str]
+    result: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

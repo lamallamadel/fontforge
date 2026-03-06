@@ -9,15 +9,17 @@ FontForge source code is never modified.
 
 from __future__ import annotations
 
+import contextlib
 import math
-from typing import TYPE_CHECKING, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aifont.core.glyph import Glyph
 
 # A 2-D affine transformation matrix as a flat 6-tuple:
 # (xx, xy, yx, yy, dx, dy)
-Matrix = Tuple[float, float, float, float, float, float]
+Matrix = tuple[float, float, float, float, float, float]
 
 
 # ---------------------------------------------------------------------------
@@ -25,7 +27,7 @@ Matrix = Tuple[float, float, float, float, float, float]
 # ---------------------------------------------------------------------------
 
 
-def simplify(glyph: "Glyph", threshold: float = 1.0) -> None:
+def simplify(glyph: Glyph, threshold: float = 1.0) -> None:
     """Simplify the contours of *glyph* by removing redundant points.
 
     Args:
@@ -34,27 +36,23 @@ def simplify(glyph: "Glyph", threshold: float = 1.0) -> None:
     """
     ff = glyph._ff
     if hasattr(ff, "simplify"):
-        try:
+        with contextlib.suppress(Exception):
             ff.simplify(threshold)  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
-def remove_overlap(glyph: "Glyph") -> None:
+def remove_overlap(glyph: Glyph) -> None:
     """Remove overlapping contour regions from *glyph*.
 
     Delegates to ``fontforge.glyph.removeOverlap()``.
     """
     ff = glyph._ff
     if hasattr(ff, "removeOverlap"):
-        try:
+        with contextlib.suppress(Exception):
             ff.removeOverlap()  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def transform(
-    glyph: "Glyph",
+    glyph: Glyph,
     matrix: Sequence[float],
 ) -> None:
     """Apply an affine transformation matrix to all contours in *glyph*.
@@ -73,13 +71,11 @@ def transform(
         raise ValueError(f"transform matrix must have 6 elements, got {len(matrix)}")
     ff = glyph._ff
     if hasattr(ff, "transform"):
-        try:
+        with contextlib.suppress(Exception):
             ff.transform(tuple(matrix))  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
-def correct_direction(glyph: "Glyph") -> None:
+def correct_direction(glyph: Glyph) -> None:
     """Set contour winding directions to the PostScript/TrueType convention.
 
     Outer contours are made counter-clockwise, inner contours (holes)
@@ -87,62 +83,52 @@ def correct_direction(glyph: "Glyph") -> None:
     """
     ff = glyph._ff
     if hasattr(ff, "correctDirection"):
-        try:
+        with contextlib.suppress(Exception):
             ff.correctDirection()  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
-def correct_directions(glyph: "Glyph") -> None:
+def correct_directions(glyph: Glyph) -> None:
     """Alias for :func:`correct_direction`."""
     correct_direction(glyph)
 
 
-def reverse_direction(glyph: "Glyph") -> None:
+def reverse_direction(glyph: Glyph) -> None:
     """Reverse the winding direction of all contours in *glyph*."""
     ff = glyph._ff
     if hasattr(ff, "reverseDirection"):
-        try:
+        with contextlib.suppress(Exception):
             ff.reverseDirection()  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
-def add_extrema(glyph: "Glyph") -> None:
+def add_extrema(glyph: Glyph) -> None:
     """Add on-curve points at the extrema of every spline.
 
     Required for valid TrueType/OpenType outlines.
     """
     ff = glyph._ff
     if hasattr(ff, "addExtrema"):
-        try:
+        with contextlib.suppress(Exception):
             ff.addExtrema()  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
-def round_to_int(glyph: "Glyph") -> None:
+def round_to_int(glyph: Glyph) -> None:
     """Round all point coordinates to integer values."""
     ff = glyph._ff
     if hasattr(ff, "round"):
-        try:
+        with contextlib.suppress(Exception):
             ff.round()  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
-def auto_hint(glyph: "Glyph") -> None:
+def auto_hint(glyph: Glyph) -> None:
     """Automatically generate PostScript hints for *glyph*."""
     ff = glyph._ff
     if hasattr(ff, "autoHint"):
-        try:
+        with contextlib.suppress(Exception):
             ff.autoHint()  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def apply_stroke(
-    glyph: "Glyph",
+    glyph: Glyph,
     width: float,
     join_type: str = "miter",
 ) -> None:
@@ -158,16 +144,14 @@ def apply_stroke(
         try:
             ff.changeWeight(width, join_type)  # type: ignore[union-attr]
         except TypeError:
-            try:
+            with contextlib.suppress(Exception):
                 ff.changeWeight(width)  # type: ignore[union-attr]
-            except Exception:  # noqa: BLE001
-                pass
         except Exception:  # noqa: BLE001
             pass
 
 
 def apply_slant(
-    glyph: "Glyph",
+    glyph: Glyph,
     angle_deg: float,
     x_origin: float = 0.0,
 ) -> None:
@@ -183,7 +167,7 @@ def apply_slant(
     transform(glyph, matrix)
 
 
-def scale(glyph: "Glyph", sx: float, sy: float) -> None:
+def scale(glyph: Glyph, sx: float, sy: float) -> None:
     """Scale *glyph* by independent horizontal and vertical factors.
 
     Args:
@@ -194,7 +178,7 @@ def scale(glyph: "Glyph", sx: float, sy: float) -> None:
     transform(glyph, (sx, 0.0, 0.0, sy, 0.0, 0.0))
 
 
-def translate(glyph: "Glyph", dx: float, dy: float) -> None:
+def translate(glyph: Glyph, dx: float, dy: float) -> None:
     """Translate *glyph* by *(dx, dy)* font units.
 
     Args:
@@ -205,7 +189,7 @@ def translate(glyph: "Glyph", dx: float, dy: float) -> None:
     transform(glyph, (1.0, 0.0, 0.0, 1.0, dx, dy))
 
 
-def smooth_transitions(glyph: "Glyph") -> None:
+def smooth_transitions(glyph: Glyph) -> None:
     """Attempt to smooth curve transitions at on-curve points.
 
     This is a lightweight wrapper around fontforge's simplify with
@@ -213,13 +197,11 @@ def smooth_transitions(glyph: "Glyph") -> None:
     """
     ff = glyph._ff
     if hasattr(ff, "simplify"):
-        try:
+        with contextlib.suppress(Exception):
             ff.simplify(0.1, ("smoothcurves",))  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
 
-def to_svg_path(glyph: "Glyph") -> str:
+def to_svg_path(glyph: Glyph) -> str:
     """Export the glyph outlines as an SVG ``<path d="...">`` string.
 
     Returns:
@@ -227,6 +209,7 @@ def to_svg_path(glyph: "Glyph") -> str:
     """
     import os
     import tempfile
+
     ff = glyph._ff
     if not hasattr(ff, "export"):
         return ""
@@ -234,7 +217,7 @@ def to_svg_path(glyph: "Glyph") -> str:
         with tempfile.TemporaryDirectory() as tmpdir:
             svg_file = os.path.join(tmpdir, "glyph.svg")
             ff.export(svg_file)  # type: ignore[union-attr]
-            with open(svg_file, "r", encoding="utf-8") as fh:
+            with open(svg_file, encoding="utf-8") as fh:
                 return fh.read()
     except Exception:  # noqa: BLE001
         return ""

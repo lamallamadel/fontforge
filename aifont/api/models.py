@@ -21,9 +21,7 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(String(256), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(256), nullable=False)
@@ -31,7 +29,9 @@ class User(Base):
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
 
-    fonts: Mapped[list[Font]] = relationship("Font", back_populates="owner", cascade="all, delete-orphan")
+    fonts: Mapped[list[Font]] = relationship(
+        "Font", back_populates="owner", cascade="all, delete-orphan"
+    )
 
 
 class Font(Base):
@@ -39,9 +39,7 @@ class Font(Base):
 
     __tablename__ = "fonts"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
     family: Mapped[str | None] = mapped_column(String(256), nullable=True)
     style: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -70,9 +68,7 @@ class AnalysisResult(Base):
 
     __tablename__ = "analysis_results"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     font_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("fonts.id", ondelete="CASCADE"), nullable=False
     )

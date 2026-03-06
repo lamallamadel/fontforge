@@ -11,29 +11,41 @@ FontForge source code is never modified.
 
 from __future__ import annotations
 
+import contextlib
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Union
 
 try:
     import fontforge  # type: ignore
+
     if not hasattr(fontforge, "font"):
         fontforge = None  # type: ignore
 except ImportError:  # pragma: no cover
     fontforge = None  # type: ignore
 
+from aifont.core.glyph import Glyph
+
 # Module-level references used by Font.open() / Font.new() and patchable in tests
 _ff = fontforge
 _FF_AVAILABLE: bool = fontforge is not None
 
-from aifont.core.glyph import Glyph
-
 # ---------------------------------------------------------------------------
 # Metadata fields accepted by set_metadata() — fontforge attribute names
 # ---------------------------------------------------------------------------
-_METADATA_FIELDS = frozenset({
-    "fontname", "familyname", "fullname", "version", "copyright",
-    "em", "ascent", "descent", "italicangle", "weight",
-})
+_METADATA_FIELDS = frozenset(
+    {
+        "fontname",
+        "familyname",
+        "fullname",
+        "version",
+        "copyright",
+        "em",
+        "ascent",
+        "descent",
+        "italicangle",
+        "weight",
+    }
+)
 
 
 class FontMetadata:
@@ -188,10 +200,7 @@ class FontMetadata:
         }
 
     def __repr__(self) -> str:
-        return (
-            f"FontMetadata(name={self.name!r}, family={self.family!r}, "
-            f"weight={self.weight!r})"
-        )
+        return f"FontMetadata(name={self.name!r}, family={self.family!r}, weight={self.weight!r})"
 
 
 class Font:
@@ -237,20 +246,22 @@ class Font:
     # ------------------------------------------------------------------
 
     @classmethod
-    def open(cls, path: Union[str, Path]) -> "Font":
+    def open(cls, path: str | Path) -> Font:
         """Open an existing font file and return a :class:`Font` instance."""
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"Font file not found: {path}")
         import aifont.core.font as _self_mod
+
         if not _self_mod._FF_AVAILABLE or _self_mod._ff is None:
             raise RuntimeError("fontforge Python bindings are not available.")
         return cls(_self_mod._ff.open(str(p)))  # type: ignore[union-attr]
 
     @classmethod
-    def new(cls, name: str = "") -> "Font":
+    def new(cls, name: str = "") -> Font:
         """Create a new, empty font and return a :class:`Font` instance."""
         import aifont.core.font as _self_mod
+
         if not _self_mod._FF_AVAILABLE or _self_mod._ff is None:
             raise RuntimeError("fontforge Python bindings are not available.")
         ff = _self_mod._ff.font()  # type: ignore[union-attr]
@@ -261,7 +272,7 @@ class Font:
         return cls(ff)
 
     @classmethod
-    def create(cls, name: str, *, family: str = "") -> "Font":
+    def create(cls, name: str, *, family: str = "") -> Font:
         """Create a new font with the given *name*.
 
         Args:
@@ -298,8 +309,7 @@ class Font:
         for key, value in kwargs.items():
             if key not in _METADATA_FIELDS:
                 raise ValueError(
-                    f"Unknown metadata field: {key!r}. "
-                    f"Valid fields: {sorted(_METADATA_FIELDS)}"
+                    f"Unknown metadata field: {key!r}. Valid fields: {sorted(_METADATA_FIELDS)}"
                 )
             setattr(self._font, key, value)
 
@@ -403,9 +413,9 @@ class Font:
     # ------------------------------------------------------------------
 
     @property
-    def glyphs(self) -> List[Glyph]:
+    def glyphs(self) -> list[Glyph]:
         """Return all glyphs in the font as a list of :class:`Glyph` wrappers."""
-        result: List[Glyph] = []
+        result: list[Glyph] = []
         for glyph_name in self._font:  # type: ignore[union-attr]
             try:
                 ff_glyph = self._font[glyph_name]  # type: ignore[index]
@@ -430,21 +440,21 @@ class Font:
         except Exception:  # noqa: BLE001
             return False
 
-    def __getitem__(self, key: Union[str, int]) -> Glyph:
+    def __getitem__(self, key: str | int) -> Glyph:
         """Return the glyph identified by *key* (name or code-point)."""
         try:
             return Glyph(self._font[key])  # type: ignore[index]
         except Exception as exc:
             raise KeyError(key) from exc
 
-    def glyph(self, name_or_codepoint: Union[str, int]) -> Optional[Glyph]:
+    def glyph(self, name_or_codepoint: str | int) -> Glyph | None:
         """Return a :class:`Glyph` by name or code-point, or ``None`` if absent."""
         try:
             return Glyph(self._font[name_or_codepoint])  # type: ignore[index]
         except Exception:  # noqa: BLE001
             return None
 
-    def get_glyph(self, name_or_codepoint: Union[str, int]) -> Glyph:
+    def get_glyph(self, name_or_codepoint: str | int) -> Glyph:
         """Return a :class:`Glyph` by name or code-point.
 
         Raises:
@@ -455,7 +465,7 @@ class Font:
             raise KeyError(name_or_codepoint)
         return g
 
-    def list_glyphs(self) -> List[str]:
+    def list_glyphs(self) -> list[str]:
         """Return a list of all glyph names in the font."""
         return [g.name for g in self.glyphs]
 
@@ -473,8 +483,8 @@ class Font:
 
     def create_glyph(
         self,
-        name_or_unicode: Union[str, int],
-        unicode_or_name: Union[str, int, None] = None,
+        name_or_unicode: str | int,
+        unicode_or_name: str | int | None = None,
     ) -> Glyph:
         """Create a new glyph in the font.
 
@@ -517,7 +527,7 @@ class Font:
     # Persistence
     # ------------------------------------------------------------------
 
-    def save(self, path: Union[str, Path], fmt: Optional[str] = None) -> None:
+    def save(self, path: str | Path, fmt: str | None = None) -> None:
         """Save the font.
 
         Args:
@@ -529,7 +539,7 @@ class Font:
         else:
             self._font.save(str(path))  # type: ignore[union-attr]
 
-    def generate(self, path: Union[str, Path], flags: Optional[tuple] = None) -> None:
+    def generate(self, path: str | Path, flags: tuple | None = None) -> None:
         """Generate (compile) the font to *path*.
 
         Args:
@@ -541,7 +551,7 @@ class Font:
         else:
             self._font.generate(str(path))  # type: ignore[union-attr]
 
-    def export(self, fmt: str, path: Optional[Union[str, Path]] = None) -> Path:
+    def export(self, fmt: str, path: str | Path | None = None) -> Path:
         """Generate a binary font file.
 
         Args:
@@ -554,8 +564,8 @@ class Font:
         Raises:
             ValueError: If the format is not recognised.
         """
-        fmt = fmt.lower()
-        _FORMAT_EXT: Dict[str, str] = {
+        fmt_lower = fmt.lower()
+        format_ext: dict[str, str] = {
             "otf": ".otf",
             "ttf": ".ttf",
             "woff": ".woff",
@@ -565,17 +575,14 @@ class Font:
             "pfb": ".pfb",
             "svg": ".svg",
         }
-        if fmt not in _FORMAT_EXT:
+        if fmt_lower not in format_ext:
             raise ValueError(
                 f"Unknown export format: {fmt!r}. "
-                f"Supported formats: {', '.join(sorted(_FORMAT_EXT))}"
+                f"Supported formats: {', '.join(sorted(format_ext))}"
             )
-        ext = _FORMAT_EXT[fmt]
-        if path is None:
-            path = Path(f"{self.name}{ext}")
-        else:
-            path = Path(path)
-        if fmt == "sfd":
+        ext = format_ext[fmt_lower]
+        path = Path(f"{self.name}{ext}") if path is None else Path(path)
+        if fmt_lower == "sfd":
             self._font.save(str(path))  # type: ignore[union-attr]
         else:
             self._font.generate(str(path))  # type: ignore[union-attr]
@@ -583,16 +590,14 @@ class Font:
 
     def close(self) -> None:
         """Close the underlying fontforge font and release resources."""
-        try:
+        with contextlib.suppress(Exception):
             self._font.close()  # type: ignore[union-attr]
-        except Exception:  # noqa: BLE001
-            pass
 
     # ------------------------------------------------------------------
     # Context manager
     # ------------------------------------------------------------------
 
-    def __enter__(self) -> "Font":
+    def __enter__(self) -> Font:
         return self
 
     def __exit__(self, *_: object) -> None:

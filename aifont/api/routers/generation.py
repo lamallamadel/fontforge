@@ -46,7 +46,9 @@ async def get_task_status(task_id: str, current_user: CurrentUser) -> TaskStatus
     error = None
 
     if result.successful():
-        task_result = result.result if isinstance(result.result, dict) else {"value": result.result}
+        task_result = (
+            result.result if isinstance(result.result, dict) else {"value": result.result}
+        )
     elif result.failed():
         error = str(result.result)
 

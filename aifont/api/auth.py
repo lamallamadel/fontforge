@@ -65,7 +65,7 @@ def decode_access_token(token: str) -> TokenData:
             raise credentials_exc
         return TokenData(sub=sub)
     except JWTError:
-        raise credentials_exc
+        raise credentials_exc from None
 
 
 # ------------------------------------------------------------------ #

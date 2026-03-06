@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from aifont.auth.models import UserRole
 
-
 # ---------------------------------------------------------------------------
 # User schemas
 # ---------------------------------------------------------------------------

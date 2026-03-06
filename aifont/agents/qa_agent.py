@@ -1,89 +1,4 @@
-"""QA Agent — validates font quality and auto-fixes common issues."""
-"""QA agent — validates font quality and auto-fixes common issues."""
-
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-
-if TYPE_CHECKING:
-    from aifont.core.font import Font
-    from aifont.core.analyzer import GlyphIssue
-
-
-@dataclass
-class QAReport:
-    """Validation report produced by the QAAgent."""
-
-    passed: bool = True
-    checks: Dict[str, bool] = field(default_factory=dict)
-    auto_fixed: List[str] = field(default_factory=list)
-    issues_remaining: List["GlyphIssue"] = field(default_factory=list)
-    confidence: float = 1.0
-
-
-class QAAgent:
-    """Runs font quality checks and applies auto-fixes.
-
-    Uses :func:`aifont.core.analyzer.analyze` for diagnostics and
-    :mod:`aifont.core.contour` for auto-corrections.
-    """
-
-    def __init__(self) -> None:
-        pass
-
-    def run(
-        self,
-        prompt: str,
-        font: Optional["Font"] = None,
-    ) -> QAReport:
-        """Validate *font* and return a :class:`QAReport`."""
-        if font is None:
-            return QAReport(passed=False, confidence=0.0)
-
-        from aifont.core.analyzer import analyze
-        from aifont.core.contour import remove_overlap
-        from aifont.core.glyph import Glyph
-
-        report_data = analyze(font)
-        checks: Dict[str, bool] = {
-            "glyph_count": report_data.glyph_count > 0,
-            "no_errors": report_data.error_count == 0,
-            "coverage": report_data.coverage_score > 0,
-        }
-        auto_fixed: List[str] = []
-
-        # Auto-fix: remove overlaps from glyphs that have issues
-        for issue in report_data.issues:
-            if issue.code == "EMPTY_GLYPH":
-                continue  # cannot auto-fix
-            try:
-                glyph = font.get_glyph(issue.glyph_name)
-                remove_overlap(glyph)
-                auto_fixed.append(issue.glyph_name)
-            except (KeyError, Exception):
-                pass
-
-        remaining = [
-            i for i in report_data.issues
-            if i.glyph_name not in auto_fixed
-        ]
-        return QAReport(
-            passed=all(checks.values()),
-            checks=checks,
-            auto_fixed=auto_fixed,
-            issues_remaining=remaining,
-        )
-import logging
-from dataclasses import dataclass, field
-from typing import List
-
-from aifont.core.font import Font
-from aifont.core.analyzer import analyze, FontReport
-from aifont.core.contour import remove_overlap
-from typing import TYPE_CHECKING
-"""
-aifont.agents.qa_agent — automated font quality assurance agent.
+"""aifont.agents.qa_agent — automated font quality assurance agent.
 
 The :class:`QAAgent` validates font quality and corrects common problems
 automatically.  It exposes a set of *tools* that can be invoked individually
@@ -113,89 +28,15 @@ This agent uses **only** ``aifont.core`` APIs.  It never imports or calls
 
 from __future__ import annotations
 
-import textwrap
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from aifont.core.analyzer import GlyphIssue, FontReport, analyze
 from aifont.core import correct_directions, remove_overlap, simplify
+from aifont.core.analyzer import FontReport, GlyphIssue, analyze
 
 if TYPE_CHECKING:
     from aifont.core.font import Font
 
-from aifont.agents.orchestrator import AgentResult
-
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class QAResult:
-    """Result from a QA run."""
-
-    passed: bool
-    report: FontReport
-    fixes_applied: List[str] = field(default_factory=list)
-
-
-class QAAgent:
-    """Validates font quality and applies automatic corrections.
-
-    Example:
-        >>> agent = QAAgent()
-        >>> font = agent.run("", font)
-        >>> result = agent.last_result
-        >>> print(result.report.summary())
-    """
-
-    def __init__(self) -> None:
-        self.last_result: QAResult | None = None
-
-    def run(self, prompt: str, font: Font) -> Font:
-        """Run QA checks and auto-fix issues.
-
-        Args:
-            prompt: Unused (included for pipeline compatibility).
-            font:   Font to validate.
-
-        Returns:
-            The (possibly corrected) font.
-        """
-        report = analyze(font)
-        fixes: List[str] = []
-
-        # Auto-fix: remove overlaps for glyphs with validation errors
-        if font._ff is not None:
-            for issue in report.issues:
-                if issue.issue_type in ("open_contour", "validation"):
-                    try:
-                        from aifont.core.glyph import Glyph
-                        g = Glyph(font._ff[issue.glyph_name])
-                        remove_overlap(g)
-                        fixes.append(f"remove_overlap:{issue.glyph_name}")
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning("Could not auto-fix %s: %s", issue.glyph_name, exc)
-
-        self.last_result = QAResult(
-            passed=not report.has_errors,
-            report=report,
-            fixes_applied=fixes,
-        )
-        logger.info("QAAgent: %s", report.summary())
-        return font
-class QAAgent:
-    """Runs :func:`~aifont.core.analyzer.analyze` on the font, interprets the
-    :class:`~aifont.core.analyzer.FontReport` and auto-corrects fixable
-    issues (path direction, overlaps, missing glyphs).
-    """
-
-    def run(self, prompt: str, font: Font) -> AgentResult:
-        logger.info("QAAgent: validating font")
-        return AgentResult(
-            agent_name="QAAgent",
-            success=True,
-            confidence=1.0,
-            message="QA passed (font has no glyphs to validate)",
-        )
 
 # ---------------------------------------------------------------------------
 # QA Report
@@ -215,8 +56,8 @@ class CheckResult:
 
     name: str
     passed: bool
-    issues: List[GlyphIssue] = field(default_factory=list)
-    corrections: List[str] = field(default_factory=list)
+    issues: list[GlyphIssue] = field(default_factory=list)
+    corrections: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -234,13 +75,9 @@ class QAReport:
 
     font_name: str
     score: float
-    checks: Dict[str, CheckResult] = field(default_factory=dict)
-    suggestions: List[str] = field(default_factory=list)
+    checks: dict[str, CheckResult] = field(default_factory=dict)
+    suggestions: list[str] = field(default_factory=list)
     corrections_applied: int = 0
-
-    # ------------------------------------------------------------------
-    # Convenience helpers
-    # ------------------------------------------------------------------
 
     @property
     def total_issues(self) -> int:
@@ -249,15 +86,11 @@ class QAReport:
 
     @property
     def passed(self) -> bool:
-        """``True`` when all checks passed (no issues remain after corrections)."""
+        """``True`` when all checks passed."""
         return all(c.passed for c in self.checks.values())
 
     def summary(self) -> str:
-        """Return a human-readable multi-line summary of the QA report.
-
-        Returns:
-            A formatted string suitable for printing to a terminal or log.
-        """
+        """Return a human-readable multi-line summary of the QA report."""
         lines = [
             f"QA Report — {self.font_name}",
             f"  Score             : {self.score:.1f}/100",
@@ -276,9 +109,7 @@ class QAReport:
                 if issue.suggestion:
                     lines.append(f"{indent}  → {issue.suggestion}")
             if result.corrections:
-                lines.append(
-                    f"         Auto-fixed: {', '.join(result.corrections)}"
-                )
+                lines.append(f"         Auto-fixed: {', '.join(result.corrections)}")
         if self.suggestions:
             lines.append("")
             lines.append("Suggestions:")
@@ -287,11 +118,7 @@ class QAReport:
         return "\n".join(lines)
 
     def to_dict(self) -> dict:
-        """Serialise the report to a plain dictionary.
-
-        Returns:
-            A ``dict`` representation suitable for JSON serialisation.
-        """
+        """Serialise the report to a plain dictionary."""
         return {
             "font_name": self.font_name,
             "score": self.score,
@@ -338,7 +165,7 @@ class QAAgent:
 
     def __init__(
         self,
-        font: "Font",
+        font: Font | None = None,
         simplify_threshold: float = 1.0,
         auto_fix: bool = True,
     ) -> None:
@@ -351,50 +178,29 @@ class QAAgent:
     # ------------------------------------------------------------------
 
     def validate_font(self) -> FontReport:
-        """Run the full diagnostic analysis on the font.
-
-        Returns:
-            A :class:`~aifont.core.analyzer.FontReport` with all detected
-            issues and a raw quality score.
-        """
+        """Run the full diagnostic analysis on the font."""
         return analyze(self._font)
 
-    def fix_overlaps(self, glyph_names: Optional[List[str]] = None) -> List[str]:
-        """Remove overlapping contours from glyphs.
-
-        Args:
-            glyph_names: Optional list of glyph names to process.  When
-                         ``None`` all glyphs in the font are processed.
-
-        Returns:
-            List of glyph names that were processed.
-        """
-        names = glyph_names or list(self._font._ff)
-        processed: List[str] = []
+    def fix_overlaps(self, glyph_names: list[str] | None = None) -> list[str]:
+        """Remove overlapping contours from glyphs."""
+        names = glyph_names or list(self._font._ff)  # type: ignore[union-attr]
+        processed: list[str] = []
         for name in names:
             try:
-                glyph = self._font.glyph(name)
+                glyph = self._font.glyph(name)  # type: ignore[union-attr]
                 remove_overlap(glyph)
                 processed.append(name)
             except Exception:
                 pass
         return processed
 
-    def correct_directions(self, glyph_names: Optional[List[str]] = None) -> List[str]:
-        """Correct winding directions for glyphs.
-
-        Args:
-            glyph_names: Optional list of glyph names to process.  When
-                         ``None`` all glyphs in the font are processed.
-
-        Returns:
-            List of glyph names that were processed.
-        """
-        names = glyph_names or list(self._font._ff)
-        processed: List[str] = []
+    def correct_directions(self, glyph_names: list[str] | None = None) -> list[str]:
+        """Correct winding directions for glyphs."""
+        names = glyph_names or list(self._font._ff)  # type: ignore[union-attr]
+        processed: list[str] = []
         for name in names:
             try:
-                glyph = self._font.glyph(name)
+                glyph = self._font.glyph(name)  # type: ignore[union-attr]
                 correct_directions(glyph)
                 processed.append(name)
             except Exception:
@@ -403,55 +209,34 @@ class QAAgent:
 
     def simplify_contours(
         self,
-        glyph_names: Optional[List[str]] = None,
-        threshold: Optional[float] = None,
-    ) -> List[str]:
-        """Simplify contours by removing unnecessary points.
-
-        Args:
-            glyph_names: Optional list of glyph names to process.
-            threshold:   Override the instance-level simplify threshold.
-
-        Returns:
-            List of glyph names that were processed.
-        """
+        glyph_names: list[str] | None = None,
+        threshold: float | None = None,
+    ) -> list[str]:
+        """Simplify contours by removing unnecessary points."""
         t = threshold if threshold is not None else self._simplify_threshold
-        names = glyph_names or list(self._font._ff)
-        processed: List[str] = []
+        names = glyph_names or list(self._font._ff)  # type: ignore[union-attr]
+        processed: list[str] = []
         for name in names:
             try:
-                glyph = self._font.glyph(name)
+                glyph = self._font.glyph(name)  # type: ignore[union-attr]
                 simplify(glyph, t)
                 processed.append(name)
             except Exception:
                 pass
         return processed
 
-    def generate_qa_report(self, font_report: Optional[FontReport] = None) -> QAReport:
-        """Generate a :class:`QAReport` from an existing (or fresh) analysis.
-
-        If *auto_fix* was enabled on the agent, auto-fixable issues will be
-        corrected before the report is finalised.
-
-        Args:
-            font_report: An existing :class:`~aifont.core.analyzer.FontReport`
-                         to build from.  When ``None`` a fresh analysis is run.
-
-        Returns:
-            A :class:`QAReport` with per-check results, a quality score, and
-            human-readable suggestions.
-        """
+    def generate_qa_report(self, font_report: FontReport | None = None) -> QAReport:
+        """Generate a :class:`QAReport` from an existing (or fresh) analysis."""
         if font_report is None:
             font_report = self.validate_font()
 
-        font_name = getattr(self._font._ff, "fontname", "unknown")
-        checks: Dict[str, CheckResult] = {}
+        font_name = getattr(getattr(self._font, "_ff", None), "fontname", "unknown")
+        checks: dict[str, CheckResult] = {}
         total_corrections = 0
-        suggestions: List[str] = []
+        suggestions: list[str] = []
 
         issues_by_type = font_report.issues_by_type
 
-        # ---- open contours ----------------------------------------
         open_issues = issues_by_type.get("open_contour", [])
         open_check = CheckResult(
             name="Open Contours",
@@ -462,53 +247,45 @@ class QAAgent:
             suggestions.append(issue.suggestion or f"Close open contour in '{issue.glyph_name}'.")
         checks["open_contours"] = open_check
 
-        # ---- wrong directions -------------------------------------
         dir_issues = issues_by_type.get("wrong_direction", [])
-        dir_corrections: List[str] = []
+        dir_corrections: list[str] = []
         if dir_issues and self._auto_fix:
             affected = [i.glyph_name for i in dir_issues]
             dir_corrections = self.correct_directions(affected)
             total_corrections += len(dir_corrections)
-        dir_check = CheckResult(
+        checks["wrong_directions"] = CheckResult(
             name="Contour Directions",
             passed=len(dir_issues) == 0,
             issues=dir_issues,
             corrections=dir_corrections,
         )
-        checks["wrong_directions"] = dir_check
 
-        # ---- overlaps ---------------------------------------------
         overlap_issues = issues_by_type.get("overlap", [])
-        overlap_corrections: List[str] = []
+        overlap_corrections: list[str] = []
         if overlap_issues and self._auto_fix:
             affected = [i.glyph_name for i in overlap_issues]
             overlap_corrections = self.fix_overlaps(affected)
             total_corrections += len(overlap_corrections)
-        overlap_check = CheckResult(
+        checks["overlaps"] = CheckResult(
             name="Overlapping Contours",
             passed=len(overlap_issues) == 0,
             issues=overlap_issues,
             corrections=overlap_corrections,
         )
-        checks["overlaps"] = overlap_check
 
-        # ---- duplicate points ------------------------------------
         dup_issues = issues_by_type.get("duplicate_point", [])
-        dup_corrections: List[str] = []
+        dup_corrections: list[str] = []
         if dup_issues and self._auto_fix:
-            # Simplify removes duplicate / near-duplicate points.
             affected = [i.glyph_name for i in dup_issues]
             dup_corrections = self.simplify_contours(affected, threshold=0.0)
             total_corrections += len(dup_corrections)
-        dup_check = CheckResult(
+        checks["duplicate_points"] = CheckResult(
             name="Duplicate Points",
             passed=len(dup_issues) == 0,
             issues=dup_issues,
             corrections=dup_corrections,
         )
-        checks["duplicate_points"] = dup_check
 
-        # ---- missing unicodes ------------------------------------
         missing = font_report.missing_unicodes
         missing_check = CheckResult(
             name="Unicode Coverage (Basic Latin)",
@@ -519,13 +296,10 @@ class QAAgent:
             sample = [f"U+{cp:04X}" for cp in missing[:10]]
             suffix = f" (and {len(missing) - 10} more)" if len(missing) > 10 else ""
             suggestions.append(
-                f"Add missing glyphs for Basic Latin code points: "
-                f"{', '.join(sample)}{suffix}."
+                f"Add missing glyphs for Basic Latin code points: {', '.join(sample)}{suffix}."
             )
         checks["unicode_coverage"] = missing_check
 
-        # ---- final score -----------------------------------------
-        # Re-run analysis after auto-corrections to get updated score.
         if self._auto_fix and total_corrections > 0:
             refreshed = analyze(self._font)
             score = refreshed.score
@@ -540,21 +314,7 @@ class QAAgent:
             corrections_applied=total_corrections,
         )
 
-    # ------------------------------------------------------------------
-    # Convenience: run everything in one call
-    # ------------------------------------------------------------------
-
     def run(self) -> QAReport:
-        """Run the complete QA pipeline and return a :class:`QAReport`.
-
-        This is the primary entry-point for the agent.  It:
-
-        1. Analyses the font with :meth:`validate_font`.
-        2. Auto-corrects issues when *auto_fix* is ``True``.
-        3. Generates and returns a full :class:`QAReport`.
-
-        Returns:
-            A :class:`QAReport` describing all findings and corrections.
-        """
+        """Run the complete QA pipeline and return a :class:`QAReport`."""
         font_report = self.validate_font()
         return self.generate_qa_report(font_report)

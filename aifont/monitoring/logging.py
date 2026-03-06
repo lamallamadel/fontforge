@@ -177,7 +177,7 @@ class _BoundLogger:
     def exception(self, message: str, **kwargs: Any) -> None:
         self._logger.exception(message, extra=kwargs)
 
-    def bind(self, **kwargs: Any) -> "_BoundLogger":
+    def bind(self, **kwargs: Any) -> _BoundLogger:
         """Return a child logger with permanent extra context."""
         child = _BoundLogger(self._logger.name)
 

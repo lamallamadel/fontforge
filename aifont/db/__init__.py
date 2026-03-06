@@ -1,15 +1,15 @@
 """AIFont database package — SQLAlchemy models, session management, and seed data."""
 
-from aifont.db.database import Base, engine, get_session, SessionLocal
+from aifont.db.database import Base, SessionLocal, engine, get_session
 from aifont.db.models import (
-    User,
-    FontProject,
-    Font,
-    Glyph,
-    KernPair,
     AgentRun,
     AgentTask,
     ExportJob,
+    Font,
+    FontProject,
+    Glyph,
+    KernPair,
+    User,
 )
 
 __all__ = [

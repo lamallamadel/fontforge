@@ -16,21 +16,21 @@ from __future__ import annotations
 import math
 import os
 import tempfile
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 try:
     import fontforge  # type: ignore
-    import psMat  # type: ignore
+    import psMat as ps_mat  # type: ignore  # noqa: N813
 except ImportError:  # pragma: no cover
     fontforge = None  # type: ignore
-    psMat = None  # type: ignore
+    ps_mat = None  # type: ignore
 
 
-def _make_psMat() -> Any:
+def _make_ps_mat() -> Any:
     """Return psMat, raising a clear error if unavailable."""
-    if psMat is None:  # pragma: no cover
+    if ps_mat is None:  # pragma: no cover
         raise RuntimeError("psMat module is not available (requires compiled FontForge).")
-    return psMat
+    return ps_mat
 
 
 class Glyph:
@@ -108,7 +108,7 @@ class Glyph:
             raise ValueError(f"width must be non-negative, got {value}")
         self._ff.width = value  # type: ignore[union-attr]
 
-    def set_width(self, value: int) -> "Glyph":
+    def set_width(self, value: int) -> Glyph:
         """Set the advance width (chainable).
 
         Args:
@@ -143,7 +143,7 @@ class Glyph:
     # ------------------------------------------------------------------
 
     @property
-    def contours(self) -> List[Any]:
+    def contours(self) -> list[Any]:
         """Return the raw fontforge contour objects for this glyph."""
         fg = getattr(self._ff, "foreground", None)
         if fg is None:
@@ -157,7 +157,7 @@ class Glyph:
     # Glyph operations
     # ------------------------------------------------------------------
 
-    def copy_from(self, other: "Glyph") -> "Glyph":
+    def copy_from(self, other: Glyph) -> Glyph:
         """Copy contours and metrics from *other* into this glyph."""
         if hasattr(self._ff, "clear"):
             self._ff.clear()  # type: ignore[union-attr]
@@ -166,46 +166,46 @@ class Glyph:
         self.width = other.width
         return self
 
-    def clear(self) -> "Glyph":
+    def clear(self) -> Glyph:
         """Remove all contours from the glyph."""
         if hasattr(self._ff, "clear"):
             self._ff.clear()  # type: ignore[union-attr]
         return self
 
-    def auto_hint(self) -> "Glyph":
+    def auto_hint(self) -> Glyph:
         """Run fontforge's auto-hinting on this glyph."""
         if hasattr(self._ff, "autoHint"):
             self._ff.autoHint()  # type: ignore[union-attr]
         return self
 
-    def remove_overlap(self) -> "Glyph":
+    def remove_overlap(self) -> Glyph:
         """Remove overlapping contours."""
         if hasattr(self._ff, "removeOverlap"):
             self._ff.removeOverlap()  # type: ignore[union-attr]
         return self
 
-    def simplify(self, error_bound: float = 1.0) -> "Glyph":
+    def simplify(self, error_bound: float = 1.0) -> Glyph:
         """Simplify the glyph's outlines."""
         if hasattr(self._ff, "simplify"):
             self._ff.simplify(error_bound)  # type: ignore[union-attr]
         return self
 
-    def correct_direction(self) -> "Glyph":
+    def correct_direction(self) -> Glyph:
         """Correct the winding direction of all contours."""
         if hasattr(self._ff, "correctDirection"):
             self._ff.correctDirection()  # type: ignore[union-attr]
         return self
 
-    def scale(self, factor: float, factor_y: Optional[float] = None) -> "Glyph":
+    def scale(self, factor: float, factor_y: float | None = None) -> Glyph:
         """Scale the glyph uniformly (or non-uniformly)."""
-        mat = _make_psMat()
+        mat = _make_ps_mat()
         fy = factor_y if factor_y is not None else factor
         self._ff.transform(mat.scale(factor, fy))  # type: ignore[union-attr]
         return self
 
-    def rotate(self, degrees: float) -> "Glyph":
+    def rotate(self, degrees: float) -> Glyph:
         """Rotate the glyph counter-clockwise by *degrees*."""
-        mat = _make_psMat()
+        mat = _make_ps_mat()
         self._ff.transform(mat.rotate(math.radians(degrees)))  # type: ignore[union-attr]
         return self
 
@@ -214,7 +214,7 @@ class Glyph:
         with tempfile.TemporaryDirectory() as tmpdir:
             svg_path = os.path.join(tmpdir, f"{self.name or 'glyph'}.svg")
             self._ff.export(svg_path)  # type: ignore[union-attr]
-            with open(svg_path, "r", encoding="utf-8") as fh:
+            with open(svg_path, encoding="utf-8") as fh:
                 return fh.read()
 
     # ------------------------------------------------------------------
@@ -222,7 +222,4 @@ class Glyph:
     # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
-        return (
-            f"Glyph(name={self.name!r}, unicode={self.unicode:#06x}, "
-            f"width={self.width})"
-        )
+        return f"Glyph(name={self.name!r}, unicode={self.unicode:#06x}, width={self.width})"

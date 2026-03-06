@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Union
 
 try:
     from fontTools.ttLib import woff2 as _woff2_module  # type: ignore
+
     _FONTTOOLS_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _woff2_module = None  # type: ignore[assignment]
@@ -61,7 +62,7 @@ def _get_ff_font(font: object) -> object:
     return font
 
 
-def _ensure_dir(path: Union[str, Path]) -> None:
+def _ensure_dir(path: str | Path) -> None:
     """Create parent directories of *path* if they do not exist."""
     Path(path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -91,7 +92,7 @@ def _convert_ttf_to_woff2(ttf_path: str, woff2_path: str) -> None:
 
 def export_otf(
     font: object,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> Path:
     """Export the font as an OpenType CFF (.otf) file.
 
@@ -111,7 +112,7 @@ def export_otf(
 
 def export_ttf(
     font: object,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> Path:
     """Export the font as a TrueType (.ttf) file.
 
@@ -131,7 +132,7 @@ def export_ttf(
 
 def export_woff(
     font: object,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> Path:
     """Export the font as a WOFF file.
 
@@ -151,7 +152,7 @@ def export_woff(
 
 def export_woff2(
     font: object,
-    path: Union[str, Path],
+    path: str | Path,
     *,
     use_fonttools: bool = False,
 ) -> Path:
@@ -179,8 +180,7 @@ def export_woff2(
 
     if use_fonttools and not _FONTTOOLS_AVAILABLE:
         raise RuntimeError(
-            "fontTools is required for WOFF2 export. "
-            "Install it with: pip install fonttools[woff]"
+            "fontTools is required for WOFF2 export. Install it with: pip install fonttools[woff]"
         )
 
     ff = _get_ff_font(font)
@@ -207,7 +207,7 @@ def export_woff2(
 
 def export_ufo(
     font: object,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> Path:
     """Export the font as a UFO (Unified Font Object) directory.
 
@@ -229,7 +229,7 @@ def export_ufo(
 
 def export_svg(
     font: object,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> Path:
     """Export the font as an SVG font file.
 
@@ -249,7 +249,7 @@ def export_svg(
 
 def export_sfd(
     font: object,
-    path: Union[str, Path],
+    path: str | Path,
 ) -> Path:
     """Save the font in FontForge's native SFD format.
 
@@ -269,11 +269,11 @@ def export_sfd(
 
 def export_all(
     font: object,
-    output_dir: Union[str, Path],
-    basename: Optional[str] = None,
-    formats: Optional[Sequence[str]] = None,
-    options: Optional[ExportOptions] = None,
-) -> Dict[str, Path]:
+    output_dir: str | Path,
+    basename: str | None = None,
+    formats: Sequence[str] | None = None,
+    options: ExportOptions | None = None,
+) -> dict[str, Path]:
     """Batch export a font to multiple formats.
 
     Args:
@@ -286,8 +286,8 @@ def export_all(
     Returns:
         Mapping from format identifier to the output :class:`Path`.
     """
-    _ALL_FORMATS = ("otf", "ttf", "woff", "woff2", "ufo", "svg")
-    _EXPORTERS = {
+    all_formats = ("otf", "ttf", "woff", "woff2", "ufo", "svg")
+    exporters = {
         "otf": export_otf,
         "ttf": export_ttf,
         "woff": export_woff,
@@ -295,12 +295,16 @@ def export_all(
         "ufo": export_ufo,
         "svg": export_svg,
     }
-    _EXT = {
-        "otf": ".otf", "ttf": ".ttf", "woff": ".woff",
-        "woff2": ".woff2", "ufo": ".ufo", "svg": ".svg",
+    ext_map = {
+        "otf": ".otf",
+        "ttf": ".ttf",
+        "woff": ".woff",
+        "woff2": ".woff2",
+        "ufo": ".ufo",
+        "svg": ".svg",
     }
     if formats is None:
-        formats = _ALL_FORMATS
+        formats = all_formats
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -309,14 +313,12 @@ def export_all(
     if basename is None:
         basename = str(getattr(ff, "fontname", None) or "font")
 
-    results: Dict[str, Path] = {}
+    results: dict[str, Path] = {}
     for fmt in formats:
         fmt_lower = fmt.lower()
-        if fmt_lower not in _EXPORTERS:
-            raise ValueError(
-                f"Unknown format {fmt!r}. Supported: {', '.join(_ALL_FORMATS)}"
-            )
-        dest = out_dir / f"{basename}{_EXT[fmt_lower]}"
-        results[fmt_lower] = _EXPORTERS[fmt_lower](font, dest)
+        if fmt_lower not in exporters:
+            raise ValueError(f"Unknown format {fmt!r}. Supported: {', '.join(all_formats)}")
+        dest = out_dir / f"{basename}{ext_map[fmt_lower]}"
+        results[fmt_lower] = exporters[fmt_lower](font, dest)
 
     return results

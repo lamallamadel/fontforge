@@ -9,9 +9,7 @@ Or call :func:`seed_all` from inside a test fixture.
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
-from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -40,7 +38,7 @@ from aifont.db.models import (
 # ---------------------------------------------------------------------------
 
 
-def seed_users(session: Session) -> List[User]:
+def seed_users(session: Session) -> list[User]:
     """Create a small set of test users."""
     users = [
         User(
@@ -67,7 +65,7 @@ def seed_users(session: Session) -> List[User]:
     return users
 
 
-def seed_projects(session: Session, users: List[User]) -> List[FontProject]:
+def seed_projects(session: Session, users: list[User]) -> list[FontProject]:
     """Create sample font projects for the seed users."""
     projects = [
         FontProject(
@@ -94,7 +92,7 @@ def seed_projects(session: Session, users: List[User]) -> List[FontProject]:
     return projects
 
 
-def seed_fonts(session: Session, projects: List[FontProject]) -> List[Font]:
+def seed_fonts(session: Session, projects: list[FontProject]) -> list[Font]:
     """Create sample font records."""
     fonts = [
         Font(
@@ -136,7 +134,7 @@ def seed_fonts(session: Session, projects: List[FontProject]) -> List[Font]:
     return fonts
 
 
-def seed_glyphs(session: Session, fonts: List[Font]) -> List[Glyph]:
+def seed_glyphs(session: Session, fonts: list[Font]) -> list[Glyph]:
     """Create a small set of glyphs for the first font."""
     basic_latin = [
         (0x0041, "A", 600),
@@ -147,7 +145,7 @@ def seed_glyphs(session: Session, fonts: List[Font]) -> List[Glyph]:
         (0x0063, "c", 520),
         (0x0020, "space", 200),
     ]
-    glyphs: List[Glyph] = []
+    glyphs: list[Glyph] = []
     for codepoint, name, width in basic_latin:
         glyphs.append(
             Glyph(
@@ -166,7 +164,7 @@ def seed_glyphs(session: Session, fonts: List[Font]) -> List[Glyph]:
     return glyphs
 
 
-def seed_kern_pairs(session: Session, fonts: List[Font]) -> List[KernPair]:
+def seed_kern_pairs(session: Session, fonts: list[Font]) -> list[KernPair]:
     """Seed common kerning pairs for the first font."""
     pairs = [
         ("A", "V", -40),
@@ -176,7 +174,7 @@ def seed_kern_pairs(session: Session, fonts: List[Font]) -> List[KernPair]:
         ("V", "A", -40),
         ("W", "A", -30),
     ]
-    kern_pairs: List[KernPair] = []
+    kern_pairs: list[KernPair] = []
     for left, right, value in pairs:
         kern_pairs.append(
             KernPair(
@@ -191,9 +189,7 @@ def seed_kern_pairs(session: Session, fonts: List[Font]) -> List[KernPair]:
     return kern_pairs
 
 
-def seed_agent_runs(
-    session: Session, projects: List[FontProject]
-) -> List[AgentRun]:
+def seed_agent_runs(session: Session, projects: list[FontProject]) -> list[AgentRun]:
     """Create sample agent run records."""
     runs = [
         AgentRun(
@@ -218,9 +214,7 @@ def seed_agent_runs(
     return runs
 
 
-def seed_agent_tasks(
-    session: Session, runs: List[AgentRun]
-) -> List[AgentTask]:
+def seed_agent_tasks(session: Session, runs: list[AgentRun]) -> list[AgentTask]:
     """Create sample agent tasks for the first completed run."""
     tasks = [
         AgentTask(
@@ -261,9 +255,7 @@ def seed_agent_tasks(
     return tasks
 
 
-def seed_export_jobs(
-    session: Session, fonts: List[Font]
-) -> List[ExportJob]:
+def seed_export_jobs(session: Session, fonts: list[Font]) -> list[ExportJob]:
     """Create sample export job records."""
     jobs = [
         ExportJob(

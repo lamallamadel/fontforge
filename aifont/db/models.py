@@ -16,8 +16,6 @@ can be created off-line and synced later without collision.
 """
 
 import enum
-import uuid
-from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
@@ -151,15 +149,11 @@ class User(TimestampMixin, Base):
     is_active = Column(Boolean, nullable=False, server_default="true")
 
     # Relationships
-    projects = relationship(
-        "FontProject", back_populates="user", cascade="all, delete-orphan"
-    )
+    projects = relationship("FontProject", back_populates="user", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("char_length(username) >= 3", name="ck_users_username_min_len"),
-        CheckConstraint(
-            "email ~* '^[^@]+@[^@]+\\.[^@]+$'", name="ck_users_email_format"
-        ),
+        CheckConstraint("email ~* '^[^@]+@[^@]+\\.[^@]+$'", name="ck_users_email_format"),
     )
 
     def __repr__(self) -> str:
@@ -191,19 +185,13 @@ class FontProject(TimestampMixin, Base):
 
     # Relationships
     user = relationship("User", back_populates="projects")
-    fonts = relationship(
-        "Font", back_populates="project", cascade="all, delete-orphan"
-    )
-    agent_runs = relationship(
-        "AgentRun", back_populates="project", cascade="all, delete-orphan"
-    )
+    fonts = relationship("Font", back_populates="project", cascade="all, delete-orphan")
+    agent_runs = relationship("AgentRun", back_populates="project", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_font_projects_user_id", "user_id"),
         Index("ix_font_projects_status", "status"),
-        CheckConstraint(
-            "char_length(name) >= 1", name="ck_font_projects_name_not_empty"
-        ),
+        CheckConstraint("char_length(name) >= 1", name="ck_font_projects_name_not_empty"),
     )
 
     def __repr__(self) -> str:
@@ -241,15 +229,9 @@ class Font(TimestampMixin, Base):
 
     # Relationships
     project = relationship("FontProject", back_populates="fonts")
-    glyphs = relationship(
-        "Glyph", back_populates="font", cascade="all, delete-orphan"
-    )
-    kern_pairs = relationship(
-        "KernPair", back_populates="font", cascade="all, delete-orphan"
-    )
-    export_jobs = relationship(
-        "ExportJob", back_populates="font", cascade="all, delete-orphan"
-    )
+    glyphs = relationship("Glyph", back_populates="font", cascade="all, delete-orphan")
+    kern_pairs = relationship("KernPair", back_populates="font", cascade="all, delete-orphan")
+    export_jobs = relationship("ExportJob", back_populates="font", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_fonts_project_id", "project_id"),
@@ -303,9 +285,7 @@ class Glyph(TimestampMixin, Base):
             "contour_data",
             postgresql_using="gin",
         ),
-        CheckConstraint(
-            "advance_width >= 0", name="ck_glyphs_advance_width_non_negative"
-        ),
+        CheckConstraint("advance_width >= 0", name="ck_glyphs_advance_width_non_negative"),
     )
 
     def __repr__(self) -> str:
@@ -381,9 +361,7 @@ class AgentRun(TimestampMixin, Base):
 
     # Relationships
     project = relationship("FontProject", back_populates="agent_runs")
-    tasks = relationship(
-        "AgentTask", back_populates="run", cascade="all, delete-orphan"
-    )
+    tasks = relationship("AgentTask", back_populates="run", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_agent_runs_project_id", "project_id"),
@@ -438,9 +416,7 @@ class AgentTask(TimestampMixin, Base):
     )
 
     def __repr__(self) -> str:
-        return (
-            f"<AgentTask id={self.id} type={self.agent_type} status={self.status}>"
-        )
+        return f"<AgentTask id={self.id} type={self.agent_type} status={self.status}>"
 
 
 class ExportJob(TimestampMixin, Base):
@@ -486,6 +462,4 @@ class ExportJob(TimestampMixin, Base):
     )
 
     def __repr__(self) -> str:
-        return (
-            f"<ExportJob id={self.id} format={self.format} status={self.status}>"
-        )
+        return f"<ExportJob id={self.id} format={self.format} status={self.status}>"

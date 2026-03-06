@@ -10,14 +10,14 @@ from __future__ import annotations
 
 __version__ = "0.1.0"
 
+from aifont.core.analyzer import FontReport, analyze
 from aifont.core.font import Font
 from aifont.core.glyph import Glyph
-from aifont.core.analyzer import FontReport, analyze
 from aifont.core.variable import (
-    VariationAxis,
-    NamedInstance,
     Master,
+    NamedInstance,
     VariableFontBuilder,
+    VariationAxis,
 )
 
 __all__ = [

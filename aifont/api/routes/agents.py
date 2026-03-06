@@ -2,23 +2,24 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
-from typing import Any, Dict, List, Optional
+from pydantic import BaseModel
 
 router = APIRouter()
 
 
 class RunRequest(BaseModel):
     prompt: str
-    font_id: Optional[str] = None
+    font_id: str | None = None
 
 
 class RunResponse(BaseModel):
     success: bool
-    steps: List[Dict[str, Any]]
-    font_id: Optional[str] = None
-    errors: List[str] = []
+    steps: list[dict[str, Any]]
+    font_id: str | None = None
+    errors: list[str] = []
 
 
 @router.post("/run", response_model=RunResponse)
