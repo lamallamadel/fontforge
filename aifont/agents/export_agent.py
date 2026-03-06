@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -58,7 +59,10 @@ class ExportAgent:
 
         fmt = self._choose_format(prompt)
         if output_path is None:
-            output_path = tempfile.mktemp(suffix=f".{fmt}")
+            import tempfile as _tempfile
+
+            fd, output_path = _tempfile.mkstemp(suffix=f".{fmt}")
+            os.close(fd)
 
         try:
             self._export(font, output_path, fmt)
