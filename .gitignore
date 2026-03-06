@@ -19,3 +19,16 @@ __pycache__
 *.py[co]
 
 build-cpp/
+
+# AIFont test artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+site/
+
+# AIFont environment variables (never commit)
+.env
+
+# SSL certificates
+ssl/
