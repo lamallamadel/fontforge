@@ -9,3 +9,12 @@ metrics optimisation, etc.) by calling aifont.core APIs.  They never call
 from aifont.agents.qa_agent import QAAgent, QAReport
 
 __all__ = ["QAAgent", "QAReport"]
+aifont.agents — AI agent layer for automated font optimisation.
+
+Agents use aifont.core as their only interface to FontForge.
+"""
+"""AIFont agents package — multi-agent layer built on top of aifont.core."""
+
+from aifont.agents.export_agent import ExportAgent
+
+__all__ = ["ExportAgent"]
