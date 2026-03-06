@@ -1602,8 +1602,8 @@ class TestQuotaInternals:
         from aifont.auth.quota import reset_quota_if_needed
 
         quota = MagicMock()
-        # reset_at in the past → should reset
-        quota.reset_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        # reset_at in the past → should reset (use fixed past time)
+        quota.reset_at = datetime(2000, 1, 1, tzinfo=timezone.utc)
         quota.exports_today = 5
 
         db = AsyncMock()
@@ -1618,8 +1618,8 @@ class TestQuotaInternals:
         from aifont.auth.quota import reset_quota_if_needed
 
         quota = MagicMock()
-        # reset_at in the future → should NOT reset
-        quota.reset_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        # reset_at in the future → should NOT reset (use fixed far-future time)
+        quota.reset_at = datetime(2099, 1, 1, tzinfo=timezone.utc)
         quota.exports_today = 5
 
         db = AsyncMock()
@@ -1634,8 +1634,8 @@ class TestQuotaInternals:
         from aifont.auth.quota import reset_quota_if_needed
 
         quota = MagicMock()
-        # naive datetime (no tzinfo) in the past — should be treated as UTC
-        quota.reset_at = datetime.now() - timedelta(hours=2)
+        # naive datetime (no tzinfo) in the past — should be treated as UTC (use fixed far-past time)
+        quota.reset_at = datetime(2000, 1, 1)  # naive, no tzinfo
         quota.exports_today = 3
 
         db = AsyncMock()
@@ -1650,12 +1650,16 @@ class TestQuotaInternals:
 
 class TestAuthGetattr:
     def test_router_attribute_importable(self):
+        import aifont.auth as auth_mod
+        # Access router — triggers lazy import; may fail with ImportError or
+        # sqlalchemy errors if dependencies aren't configured, but must not
+        # raise AttributeError (which would mean __getattr__ broke).
         try:
-            import aifont.auth as auth_mod
-            # Access router — triggers lazy import; may fail if sqlalchemy not configured
             _ = auth_mod.router
+        except AttributeError:
+            raise  # AttributeError means the lazy import mechanism itself broke
         except Exception:
-            pass  # acceptable — only testing that __getattr__ executes
+            pass  # ImportError / sqlalchemy errors are acceptable in test env
 
     def test_unknown_attribute_raises_attribute_error(self):
         import aifont.auth as auth_mod
@@ -1797,8 +1801,12 @@ class TestExportMoreFormats:
              patch("aifont.core.export.export_woff2") as mock_woff2, \
              patch("aifont.core.export.export_ufo") as mock_ufo, \
              patch("aifont.core.export.export_svg") as mock_svg:
-            for m in (mock_otf, mock_ttf, mock_woff, mock_woff2, mock_ufo, mock_svg):
-                m.side_effect = lambda f, p: p
+            mock_otf.side_effect = lambda f, p: p
+            mock_ttf.side_effect = lambda f, p: p
+            mock_woff.side_effect = lambda f, p: p
+            mock_woff2.side_effect = lambda f, p: p
+            mock_ufo.side_effect = lambda f, p: p
+            mock_svg.side_effect = lambda f, p: p
             result = export_all(font, str(tmp_path), basename="TestFont")
         assert isinstance(result, dict)
         assert "otf" in result
