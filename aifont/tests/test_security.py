@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 def test_hash_password_returns_bcrypt_hash():
     from aifont.auth.security import hash_password

@@ -6,7 +6,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -486,7 +485,7 @@ class TestAnalyzerAdditional:
         assert "10" in s
 
     def test_analyze_empty_font_uses_font_wrapper(self):
-        from aifont.core.analyzer import analyze, FontReport
+        from aifont.core.analyzer import FontReport, analyze
         from aifont.core.font import Font
 
         ff = _make_mock_ff()
@@ -646,7 +645,7 @@ class TestContourExtended:
         assert result == ""
 
     def test_correct_direction_alias(self):
-        from aifont.core.contour import correct_direction, correct_directions
+        from aifont.core.contour import correct_directions
         from aifont.core.glyph import Glyph
         g = Glyph(MagicMock())
         correct_directions(g)  # calls correct_direction internally
@@ -684,7 +683,8 @@ class TestSvgParserExtended:
 
     def test_collect_path_data_single_path(self):
         import xml.etree.ElementTree as ET
-        from aifont.core.svg_parser import _collect_path_data, _SVG_NS
+
+        from aifont.core.svg_parser import _SVG_NS, _collect_path_data
         svg_xml = f'<svg xmlns="{_SVG_NS}"><path d="M 0 0 L 100 100"/></svg>'
         root = ET.fromstring(svg_xml)
         paths = _collect_path_data(root)
@@ -693,6 +693,7 @@ class TestSvgParserExtended:
 
     def test_collect_path_data_empty_svg(self):
         import xml.etree.ElementTree as ET
+
         from aifont.core.svg_parser import _collect_path_data
         root = ET.fromstring('<svg/>')
         paths = _collect_path_data(root)
@@ -710,6 +711,7 @@ class TestSvgParserExtended:
 
     def test_svg_to_glyph_no_ff(self):
         import tempfile
+
         from aifont.core.svg_parser import svg_to_glyph
         svg_content = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M 0 0 Z"/></svg>'
         with tempfile.NamedTemporaryFile(mode="w", suffix=".svg", delete=False) as f:
@@ -818,7 +820,8 @@ class TestFontExtended:
         from aifont.core.font import Font
         ff = _make_mock_ff()
         font = Font(ff)
-        import tempfile, os
+        import os
+        import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "test.sfd")
             font.save(path)
@@ -838,8 +841,8 @@ class TestFontExtended:
         assert "em_size" in meta
 
     def test_new_raises_without_fontforge(self):
-        from aifont.core.font import Font
         import aifont.core.font as fmod
+        from aifont.core.font import Font
         with patch.object(fmod, "_FF_AVAILABLE", False):
             try:
                 Font.new("Test")
@@ -906,7 +909,6 @@ class TestMetricsExtended:
 class TestMetricsAgentExtended:
     def test_set_kern_pair(self):
         from aifont.agents.metrics_agent import MetricsAgent
-        from aifont.core.metrics import SpacingAnalysis
         agent = MetricsAgent()
         with patch("aifont.agents.metrics_agent.set_kern") as mock_set_kern:
             agent.set_kern_pair(MagicMock(), "A", "V", -30)
@@ -937,8 +939,9 @@ class TestMetricsAgentExtended:
         assert result.confidence == 0.5
 
     def test_metrics_report_asdict(self):
-        from aifont.agents.metrics_agent import MetricsReport
         from dataclasses import asdict
+
+        from aifont.agents.metrics_agent import MetricsReport
         r = MetricsReport(font_name="Test")
         d = asdict(r)
         assert "font_name" in d
@@ -971,8 +974,9 @@ class TestExportAgentExtended:
         assert result.success is False
 
     def test_run_with_legacy_api(self):
+        import tempfile
+
         from aifont.agents.export_agent import ExportAgent, ExportResult
-        import tempfile, os
         agent = ExportAgent(generate_specimen=False, generate_css=False, validate=False)
         font = _make_font()
         with (
@@ -1235,7 +1239,8 @@ class TestExportExtended:
         with patch("aifont.core.export.export_woff2", return_value=None):
             # subset_font(font, path, languages) - positional arg, not kwarg
             try:
-                import tempfile, os
+                import os
+                import tempfile
                 with tempfile.TemporaryDirectory() as tmpdir:
                     out = os.path.join(tmpdir, "out.woff2")
                     result = subset_font(ff, out, [])
@@ -1243,8 +1248,8 @@ class TestExportExtended:
                 pass  # acceptable
 
     def test_export_all_with_otf(self):
-        import os
         import tempfile
+
         from aifont.core.export import export_all
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1357,7 +1362,8 @@ class TestFontWithGlyphs:
         assert font.glyph_count == 3
 
     def test_export_otf(self):
-        import tempfile, os
+        import os
+        import tempfile
         font, ff = _make_font_with_glyphs()
         with tempfile.TemporaryDirectory() as tmpdir:
             out = os.path.join(tmpdir, "test.otf")
@@ -1365,7 +1371,8 @@ class TestFontWithGlyphs:
             ff.generate.assert_called()
 
     def test_export_sfd(self):
-        import tempfile, os
+        import os
+        import tempfile
         font, ff = _make_font_with_glyphs()
         with tempfile.TemporaryDirectory() as tmpdir:
             out = os.path.join(tmpdir, "test.sfd")
@@ -1430,7 +1437,6 @@ class TestAnalyzerWithGlyphs:
 
     def test_analyze_with_glyphs(self):
         from aifont.core.analyzer import FontReport, analyze
-        from aifont.core.font import Font
         font, ff = _make_font_with_glyphs()
         # Add unicode and validate to glyphs
         report = analyze(font)
@@ -1439,7 +1445,6 @@ class TestAnalyzerWithGlyphs:
 
     def test_analyze_with_validation_errors(self):
         from aifont.core.analyzer import FontReport, analyze
-        from aifont.core.font import Font
         font, ff = _make_font_with_glyphs()
         # Simulate glyph validate returning errors
         for glyph_mock in [ff.__getitem__("A"), ff.__getitem__("B"), ff.__getitem__("space")]:
@@ -1490,7 +1495,6 @@ class TestVariableFontBuilderExtended:
         from aifont.core.variable import (
             Master,
             NamedInstance,
-            VariableFontBuilder,
             VariationAxis,
             check_opentype_conformance,
         )

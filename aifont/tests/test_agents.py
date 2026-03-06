@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -555,7 +554,6 @@ class TestStyleAgentExtended:
 class TestQAAgentExtended:
     def test_fix_overlaps_with_glyphs(self):
         from aifont.agents.qa_agent import QAAgent
-        from aifont.core.contour import remove_overlap
 
         font = _make_font_wrapper()
         agent = QAAgent(font=font)
@@ -627,8 +625,9 @@ class TestExportAgentMoreCoverage:
             pass
 
     def test_export_validate_file_missing(self):
-        from aifont.agents.export_agent import ExportAgent
         from pathlib import Path
+
+        from aifont.agents.export_agent import ExportAgent
 
         agent = ExportAgent()
         result = agent._validate_file("woff2", Path("/tmp/nonexistent.woff2"))
@@ -659,7 +658,9 @@ class TestExportAgentMoreCoverage:
 
 class TestExportAgentMorePaths:
     def test_run_with_output_path(self):
-        import tempfile, os
+        import os
+        import tempfile
+
         from aifont.agents.export_agent import ExportAgent, ExportResult
 
         agent = ExportAgent()
@@ -672,7 +673,7 @@ class TestExportAgentMorePaths:
         assert result.success is True
 
     def test_run_with_output_path_no_font(self):
-        from aifont.agents.export_agent import ExportAgent, ExportResult
+        from aifont.agents.export_agent import ExportAgent
 
         agent = ExportAgent()
         result = agent.run("export", font=None, output_path="/tmp/font.otf")
@@ -681,6 +682,7 @@ class TestExportAgentMorePaths:
     def test_write_specimen(self):
         import tempfile
         from pathlib import Path
+
         from aifont.agents.export_agent import ExportAgent
 
         agent = ExportAgent()
@@ -696,6 +698,7 @@ class TestExportAgentMorePaths:
 
     def test_build_css_relative(self):
         from pathlib import Path
+
         from aifont.agents.export_agent import ExportAgent
 
         agent = ExportAgent()
@@ -705,6 +708,7 @@ class TestExportAgentMorePaths:
     def test_validate_file_existing_small(self):
         import tempfile
         from pathlib import Path
+
         from aifont.agents.export_agent import ExportAgent
 
         agent = ExportAgent()
@@ -725,6 +729,7 @@ class TestExportAgentMorePaths:
     def test_export_format_path_woff2(self):
         import tempfile
         from pathlib import Path
+
         from aifont.agents.export_agent import ExportAgent
 
         agent = ExportAgent()
@@ -737,6 +742,7 @@ class TestExportAgentMorePaths:
     def test_run_full_pipeline_with_mock_exports(self):
         import tempfile
         from pathlib import Path
+
         from aifont.agents.export_agent import ExportAgent, ExportResult
 
         agent = ExportAgent(generate_specimen=True, generate_css=True, validate=False)
@@ -797,6 +803,5 @@ class TestQAAgentMorePaths:
 
     def test_check_result_init(self):
         from aifont.agents.qa_agent import CheckResult
-        from aifont.core.analyzer import GlyphIssue
         cr = CheckResult(name="test", passed=True)
         assert cr.passed is True
