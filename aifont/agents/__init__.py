@@ -1,3 +1,15 @@
+"""
+aifont.agents — AI agent layer built on top of the aifont.core SDK.
+
+Agents orchestrate high-level tasks by calling ``aifont.core`` APIs.
+They never call ``fontforge`` directly.
+"""
+
+from __future__ import annotations
+
+from aifont.agents.style_agent import StyleAgent, StyleTransferResult
+
+__all__ = ["StyleAgent", "StyleTransferResult"]
 """aifont.agents — AI agent layer built on top of aifont.core."""
 """aifont.agents — multi-agent AI layer for font generation and analysis."""
 """AIFont agents — AI-powered font operations built on aifont.core."""
