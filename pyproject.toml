@@ -192,7 +192,7 @@ source = ["aifont"]
 branch = true
 omit = [
     "tests/*",
-    "aifont/tests/*",                          # legacy test suite inside package
+    "aifont/tests/*",                          # internal test suite inside the package (not run by pytest testpaths)
     "aifont/api/main.py",                      # ASGI entrypoint — covered via integration tests
     "aifont/api/auth.py",                      # HTTP auth middleware
     "aifont/api/config.py",                    # server config (env-driven)

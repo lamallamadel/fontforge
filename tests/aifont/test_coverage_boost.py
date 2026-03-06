@@ -602,7 +602,8 @@ class TestExportAgentHelpers:
                 Path(p).write_bytes(b"\x00" * 200)
             mock_exp.side_effect = side_otf
             result = agent.run(font, output_dir=str(tmp_path), target=ExportTarget.PRINT)
-        assert result.css_snippet != "" or result.specimen_path is not None or True
+        # With a real file written, css_snippet and specimen_path should be populated
+        assert result.css_snippet != "" or result.specimen_path is not None
 
 
 # ===========================================================================

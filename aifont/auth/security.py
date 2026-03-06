@@ -16,10 +16,21 @@ _KEY_ALPHABET = string.ascii_letters + string.digits
 
 
 def _prepare_password(plain: str) -> bytes:
-    """SHA-256 pre-hash so passwords longer than bcrypt's 72-byte limit are
-    handled safely and deterministically (OWASP-aligned)."""
-    return hashlib.sha256(plain.encode("utf-8")).digest()
+    """SHA-256 pre-hash before bcrypt so passwords longer than bcrypt's
+    72-byte limit are handled safely and deterministically.
 
+    This is the approach recommended by OWASP Password Storage Cheat Sheet
+    (https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+    for bcrypt when supporting passwords >72 bytes.
+
+    Migration note: hashes produced by this function are NOT compatible with
+    hashes produced by passlib's CryptContext, because passlib passes the raw
+    password bytes to bcrypt whereas this function passes SHA-256(password).
+    Any existing passlib-generated hashes must be re-hashed on next login or
+    via a one-time migration before deploying this change to a system that
+    already has users.
+    """
+    return hashlib.sha256(plain.encode("utf-8")).digest()
 
 def hash_password(plain: str) -> str:
     """Return the bcrypt hash of *plain*."""
