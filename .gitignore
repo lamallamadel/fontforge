@@ -32,3 +32,4 @@ site/
 
 # SSL certificates
 ssl/
+aifont/aifont.egg-info/

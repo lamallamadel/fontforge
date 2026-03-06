@@ -60,7 +60,7 @@ class _MockFfGlyph:
     def stroke(self, *args, **kwargs):
         self._stroke_calls.append((args, kwargs))
 
-    def simplify(self, error_bound, flags):
+    def simplify(self, error_bound, flags=()):
         self._simplified = True
         self._simplify_args = (error_bound, flags)
 
@@ -227,7 +227,7 @@ class TestGlyphContours(unittest.TestCase):
         self.glyph = Glyph(self._ff)
 
     def test_contours_returns_foreground(self):
-        self.assertIs(self.glyph.contours, self._ff.foreground)
+        self.assertEqual(self.glyph.contours, list(self._ff.foreground))
 
     def test_has_open_contours_empty(self):
         self.assertFalse(self.glyph.has_open_contours)
