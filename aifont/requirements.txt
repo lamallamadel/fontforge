@@ -1,3 +1,19 @@
+# AIFont SDK and AI agent layer — Python dependencies
+# These are the runtime requirements for the aifont package.
+# For development and testing, install the extras below.
+
+# Core API framework
+fastapi>=0.100.0
+pydantic>=2.0
+
+# ASGI server (optional runtime dependency)
+# uvicorn[standard]>=0.20
+
+# Font manipulation (installed separately, not from PyPI)
+# fontforge — install via system package manager or build from source
+
+# ─── Test dependencies ───────────────────────────────────────────────────────
+# Install with: pip install -r requirements-dev.txt
 defusedxml>=0.7.1
 fonttools>=4.0.0
 # AIFont platform dependencies
