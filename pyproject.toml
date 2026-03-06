@@ -174,3 +174,6 @@ repair-wheel-command = "delvewheel repair --add-path C:/vcpkg/installed/x64-wind
 # Add the repository root to sys.path so `import aifont` works without install
 pythonpath = ["."]
 testpaths = ["tests"]
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"

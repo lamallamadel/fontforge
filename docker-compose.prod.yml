@@ -1,0 +1,186 @@
+# ── AIFont — Production docker-compose ────────────────────────────────────────
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# All secrets MUST be set via environment variables or Docker Secrets.
+# See .env.example for required variables.
+# ──────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+x-common-env: &common-env
+  REDIS_URL: redis://cache:6379/0
+  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  SECRET_KEY: ${SECRET_KEY}
+  ENVIRONMENT: production
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    # No external port exposure in production
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  cache:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --save 60 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── FontForge ───────────────────────────────────────────────────────────────
+  fontforge:
+    build:
+      context: .
+      dockerfile: docker/fontforge/Dockerfile
+    restart: always
+    environment:
+      <<: *common-env
+    volumes:
+      - font_storage:/app/fonts
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import fontforge"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  # ── API ─────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: aifont/api/Dockerfile
+    restart: always
+    environment:
+      <<: *common-env
+      FONTFORGE_SERVICE_URL: http://fontforge:8001
+      WORKERS: ${API_WORKERS:-4}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    volumes:
+      - font_storage:/app/fonts
+    networks:
+      - backend
+      - frontend
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    command: >
+      uvicorn aifont.api.main:app
+        --host 0.0.0.0
+        --port 8000
+        --workers ${API_WORKERS:-4}
+        --proxy-headers
+        --forwarded-allow-ips=*
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+      replicas: 2
+
+  # ── Worker ──────────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: aifont/worker/Dockerfile
+    restart: always
+    environment:
+      <<: *common-env
+    volumes:
+      - font_storage:/app/fonts
+    networks:
+      - backend
+    depends_on:
+      cache:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A aifont.worker.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+      replicas: 2
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro   # mount TLS certificates
+    networks:
+      - frontend
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  backend:
+    driver: bridge
+    internal: true   # backend services not reachable from outside
+  frontend:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  font_storage:
+    driver: local

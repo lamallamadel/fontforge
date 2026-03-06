@@ -19,3 +19,10 @@ __pycache__
 *.py[co]
 
 build-cpp/
+site/
+
+# AIFont environment variables (never commit)
+.env
+
+# SSL certificates
+ssl/

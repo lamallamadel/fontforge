@@ -11,3 +11,4 @@ __all__ = [
     "analyze",
     "FontReport",
 ]
+"""AIFont utility modules."""
