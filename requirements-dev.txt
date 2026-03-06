@@ -1,0 +1,24 @@
+# Development and test dependencies for AIFont
+# Install with: pip install -r requirements-dev.txt
+
+# Test framework
+pytest>=7.0
+pytest-asyncio>=0.21
+pytest-cov>=4.0
+
+# HTTP test client
+httpx>=0.24
+starlette          # provides TestClient (pulled in by fastapi)
+
+# HTTP file upload support (required by FastAPI for multipart/form-data)
+python-multipart>=0.0.6
+
+# API framework
+fastapi>=0.100.0
+pydantic>=2.0
+
+# Load testing
+locust>=2.0
+
+# Browser automation (E2E tests)
+playwright>=1.30

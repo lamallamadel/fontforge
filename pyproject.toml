@@ -165,3 +165,49 @@ before-build = "pip install delvewheel"
 
 # Repair wheels with delvewheel, adding vcpkg DLL path
 repair-wheel-command = "delvewheel repair --add-path C:/vcpkg/installed/x64-windows/bin -w {dest_dir} {wheel}"
+
+# ============================================================================
+# AIFont — pytest & coverage configuration
+# ============================================================================
+
+[tool.pytest.ini_options]
+# Discover tests in tests/aifont/ only (not the existing CMake-driven tests)
+testpaths = ["tests/aifont"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+pythonpath = ["."]
+addopts = [
+    "--tb=short",
+    "--strict-markers",
+]
+markers = [
+    "e2e: end-to-end tests requiring a running server (skipped by default)",
+    "slow: slow tests",
+]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["aifont"]
+branch = true
+omit = [
+    "tests/*",
+    "aifont/api/main.py",   # ASGI entrypoint — covered via integration tests
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
