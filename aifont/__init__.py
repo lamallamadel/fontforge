@@ -1,4 +1,17 @@
 """
+AIFont — a Pythonic SDK built on top of FontForge's Python bindings.
+
+Usage::
+
+    from aifont import AIFont
+
+    font = AIFont.create("MyFont", family="Sans-Serif")
+    font.save("output.sfd")
+"""
+
+from aifont.core.font import AIFont
+
+__all__ = ["AIFont"]
 aifont — Pythonic SDK built on top of FontForge Python bindings.
 
 AIFont provides a high-level, ergonomic API for font creation and manipulation.
