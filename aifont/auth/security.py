@@ -2,30 +2,33 @@
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 import string
 
-from passlib.context import CryptContext
+import bcrypt
 
-# bcrypt with a work factor of 12 (OWASP recommendation for bcrypt).
-_pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__rounds=12,
-)
+# Work factor of 12 is the OWASP recommendation for bcrypt.
+_BCRYPT_ROUNDS = 12
 
 # Characters allowed in auto-generated API keys (URL-safe, no ambiguous chars).
 _KEY_ALPHABET = string.ascii_letters + string.digits
 
 
+def _prepare_password(plain: str) -> bytes:
+    """SHA-256 pre-hash so passwords longer than bcrypt's 72-byte limit are
+    handled safely and deterministically (OWASP-aligned)."""
+    return hashlib.sha256(plain.encode("utf-8")).digest()
+
+
 def hash_password(plain: str) -> str:
     """Return the bcrypt hash of *plain*."""
-    return _pwd_context.hash(plain)
+    return bcrypt.hashpw(_prepare_password(plain), bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Return True if *plain* matches *hashed*."""
-    return _pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(_prepare_password(plain), hashed.encode("utf-8"))
 
 
 def generate_secure_token(nbytes: int = 32) -> str:

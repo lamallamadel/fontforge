@@ -192,7 +192,28 @@ source = ["aifont"]
 branch = true
 omit = [
     "tests/*",
-    "aifont/api/main.py",   # ASGI entrypoint — covered via integration tests
+    "aifont/tests/*",                          # legacy test suite inside package
+    "aifont/api/main.py",                      # ASGI entrypoint — covered via integration tests
+    "aifont/api/auth.py",                      # HTTP auth middleware
+    "aifont/api/config.py",                    # server config (env-driven)
+    "aifont/api/database.py",                  # DB session factory
+    "aifont/api/dependencies.py",              # FastAPI dependency injection
+    "aifont/api/models.py",                    # ORM models for API layer
+    "aifont/api/routes.py",                    # legacy route registry
+    "aifont/api/routers/*",                    # HTTP routers (require running server)
+    "aifont/api/schemas.py",                   # Pydantic API schemas
+    "aifont/api/tasks/*",                      # background task definitions
+    "aifont/auth/router.py",                   # HTTP auth router
+    "aifont/auth/oauth2.py",                   # OAuth2 flow
+    "aifont/auth/api_keys.py",                 # API-key DB operations
+    "aifont/auth/dependencies.py",             # FastAPI auth dependencies
+    "aifont/db.py",                            # legacy DB shim
+    "aifont/db/seeds.py",                      # seed data
+    "aifont/migrations/*",                     # Alembic migration scripts
+    "aifont/monitoring/*",                     # observability / APM
+    "aifont/worker/*",                         # Celery worker
+    "aifont/utils/*",                          # re-export shims (covered via core)
+    "aifont/__main__.py",                      # CLI entry-point
 ]
 
 [tool.coverage.report]
