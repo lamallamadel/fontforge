@@ -1,8 +1,12 @@
+"""AIFont core SDK — Python wrappers around FontForge's Python bindings."""
 """AIFont core SDK — high-level wrappers around FontForge's Python bindings."""
 
 from aifont.core.export import (
     export_otf,
     export_ttf,
+    export_woff2,
+    export_variable,
+    subset_font,
     export_woff,
     export_woff2,
     export_ufo,
@@ -14,6 +18,9 @@ from aifont.core.export import (
 __all__ = [
     "export_otf",
     "export_ttf",
+    "export_woff2",
+    "export_variable",
+    "subset_font",
     "export_woff",
     "export_woff2",
     "export_ufo",
