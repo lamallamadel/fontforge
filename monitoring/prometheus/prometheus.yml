@@ -1,0 +1,84 @@
+# ---------------------------------------------------------------------------
+# Prometheus configuration for the AIFont monitoring stack
+# ---------------------------------------------------------------------------
+
+global:
+  scrape_interval: 15s        # How often to scrape targets
+  evaluation_interval: 15s    # How often to evaluate alert rules
+  scrape_timeout: 10s
+
+  external_labels:
+    monitor: "aifont"
+    environment: "production"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Alert rule files
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# ---------------------------------------------------------------------------
+# Scrape configurations
+# ---------------------------------------------------------------------------
+scrape_configs:
+
+  # ----------------------------------------------------------
+  # AIFont API service
+  # ----------------------------------------------------------
+  - job_name: "aifont-api"
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - aifont-api:8000
+        labels:
+          service: "aifont-api"
+          environment: "production"
+
+  # ----------------------------------------------------------
+  # Prometheus self-monitoring
+  # ----------------------------------------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  # ----------------------------------------------------------
+  # Alertmanager
+  # ----------------------------------------------------------
+  - job_name: "alertmanager"
+    static_configs:
+      - targets:
+          - alertmanager:9093
+
+  # ----------------------------------------------------------
+  # Grafana
+  # ----------------------------------------------------------
+  - job_name: "grafana"
+    static_configs:
+      - targets:
+          - grafana:3000
+
+  # ----------------------------------------------------------
+  # Node Exporter — host OS metrics
+  # ----------------------------------------------------------
+  - job_name: "node-exporter"
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - node-exporter:9100
+        labels:
+          instance: "aifont-host"
+
+  # ----------------------------------------------------------
+  # Loki — log aggregation service
+  # ----------------------------------------------------------
+  - job_name: "loki"
+    static_configs:
+      - targets:
+          - loki:3100
