@@ -16,11 +16,12 @@ from typing import List, Optional, Tuple
 
 try:
     import fontforge  # type: ignore
+    # Guard against the namespace-package stub that lacks the C extension API.
     if not hasattr(fontforge, "font"):
-        fontforge = None  # type: ignore
+        fontforge = None  # type: ignore  # C extension not installed
     _FF_AVAILABLE = fontforge is not None
 except ImportError:  # pragma: no cover
-    fontforge = None  # type: ignore
+    fontforge = None  # type: ignore  # fontforge not installed at all
     _FF_AVAILABLE = False
 
 # SVG XML namespace
