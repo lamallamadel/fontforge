@@ -1,3 +1,4 @@
+"""AIFont — AI-powered font design SDK built on top of FontForge."""
 """AIFont — Python SDK built on top of FontForge's Python bindings."""
 """
 AIFont — Python SDK and AI agent layer built on top of FontForge.
