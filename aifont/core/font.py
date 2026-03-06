@@ -293,6 +293,9 @@ All heavy lifting is delegated to the underlying ``fontforge.font`` object.
 
 from __future__ import annotations
 
+import math
+from pathlib import Path
+from typing import Iterator, List, Optional, Union
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -344,6 +347,11 @@ class Font:
     # ------------------------------------------------------------------
 
     @classmethod
+    def open(cls, path: Union[str, Path]) -> "Font":
+        """Open an existing font file.
+
+        Args:
+            path: Path to the font file (.sfd, .otf, .ttf, …).
     def open(cls, path: str) -> "Font":
         """Open an existing font file.
 
@@ -469,6 +477,13 @@ class Font:
             A new :class:`Font` instance.
 
         Raises:
+            RuntimeError: If the fontforge bindings are unavailable.
+        """
+        if fontforge is None:
+            raise RuntimeError("fontforge Python bindings are not available.")
+        return cls(fontforge.open(str(path)))
+
+    @classmethod
             FileNotFoundError: If the file does not exist.
             RuntimeError: If FontForge cannot open the file.
         """
@@ -857,6 +872,14 @@ class Font:
         """Create a new, empty font.
 
         Returns:
+            A new :class:`Font` instance.
+
+        Raises:
+            RuntimeError: If the fontforge bindings are unavailable.
+        """
+        if fontforge is None:
+            raise RuntimeError("fontforge Python bindings are not available.")
+        return cls(fontforge.font())
             A :class:`Font` wrapping a blank fontforge font.
 
         Raises:
@@ -876,6 +899,32 @@ class Font:
     # Persistence
     # ------------------------------------------------------------------
 
+    def save(self, path: Union[str, Path], fmt: Optional[str] = None) -> None:
+        """Save the font.
+
+        When *fmt* is ``None`` the font is saved in FontForge's native SFD
+        format via ``font.save()``.  When *fmt* is provided (e.g. ``"otf"``,
+        ``"ttf"``, ``"woff2"``) the font is exported via ``font.generate()``
+        using *path*; if *path* does not already carry the right extension it
+        is appended automatically so that FontForge infers the correct output
+        format from the filename.
+
+        Args:
+            path: Destination file path.
+            fmt:  Optional target format extension without a leading dot
+                  (e.g. ``"otf"``, ``"ttf"``).  When *None* the font is saved
+                  in SFD format.
+        """
+        p = Path(path)
+        if fmt is None:
+            self._font.save(str(p))
+        else:
+            # Ensure the file extension matches the requested format so that
+            # FontForge can determine the output format from the filename.
+            ext = fmt.lstrip(".")
+            if p.suffix.lstrip(".").lower() != ext.lower():
+                p = p.with_suffix(f".{ext}")
+            self._font.generate(str(p))
     def save(self, path: str | Path, fmt: Optional[str] = None) -> None:
         """Save the font in FontForge's native SFD format or another format.
 
@@ -920,6 +969,7 @@ class Font:
     # ------------------------------------------------------------------
 
     @property
+    def glyphs(self) -> List["Glyph"]:
     def glyphs(self) -> list:
         """Return a list of raw fontforge glyph objects in this font."""
         result = []
@@ -946,6 +996,7 @@ class Font:
         """
         from aifont.core.glyph import Glyph  # local import avoids circular deps
 
+        result: List[Glyph] = []
         result = []
         for name in self._font:
             try:
@@ -954,11 +1005,15 @@ class Font:
                 pass
         return result
 
+    def glyph(self, name_or_unicode: Union[str, int]) -> "Glyph":
     def glyph(self, name_or_unicode: str | int) -> "Glyph":
         """Return a single :class:`~aifont.core.glyph.Glyph` by name or codepoint.
 
         Args:
             name_or_unicode: Glyph name (str) or Unicode code point (int).
+
+        Returns:
+            :class:`~aifont.core.glyph.Glyph` wrapper.
         """
         from aifont.core.glyph import Glyph
 
@@ -969,6 +1024,22 @@ class Font:
     # ------------------------------------------------------------------
 
     @property
+    def metadata(self) -> dict:
+        """Font-level metadata as a plain dictionary."""
+        f = self._font
+        return {
+            "family_name": getattr(f, "familyname", ""),
+            "full_name": getattr(f, "fullname", ""),
+            "weight": getattr(f, "weight", ""),
+            "version": getattr(f, "version", ""),
+            "copyright": getattr(f, "copyright", ""),
+            "em_size": getattr(f, "em", 1000),
+            "ascent": getattr(f, "ascent", 800),
+            "descent": getattr(f, "descent", 200),
+        }
+
+    # ------------------------------------------------------------------
+    # Internal
     def metadata(self) -> dict[str, str]:
         """Return a dict of common font metadata fields."""
         f = self._font
@@ -1041,6 +1112,11 @@ class Font:
 
     @property
     def _ff(self) -> object:
+        """Direct access to the underlying fontforge font object (internal use)."""
+        return self._font
+
+    def __repr__(self) -> str:
+        name = getattr(self._font, "fontname", "?")
         """The raw fontforge font object (use only inside aifont.core)."""
         return self._font
             "copyright": getattr(ff, "copyright", ""),

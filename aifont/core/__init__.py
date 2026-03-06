@@ -1,3 +1,10 @@
+"""
+aifont.core — Core SDK for font and glyph manipulation.
+
+Modules
+-------
+font     : Font wrapper around ``fontforge.font``.
+glyph    : Glyph wrapper around ``fontforge.glyph``.
 """aifont.core — Python wrappers around FontForge Python bindings.
 
 DO NOT import fontforge directly from user code — use this sub-package.
