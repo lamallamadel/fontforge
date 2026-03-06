@@ -30,11 +30,14 @@ def _prepare_password(plain: str) -> bytes:
     via a one-time migration before deploying this change to a system that
     already has users.
     """
-    return hashlib.sha256(plain.encode("utf-8")).digest()
+    return hashlib.sha256(plain.encode("utf-8")).hexdigest().encode("ascii")
+
 
 def hash_password(plain: str) -> str:
     """Return the bcrypt hash of *plain*."""
-    return bcrypt.hashpw(_prepare_password(plain), bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)).decode("utf-8")
+    return bcrypt.hashpw(_prepare_password(plain), bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)).decode(
+        "utf-8"
+    )
 
 
 def verify_password(plain: str, hashed: str) -> bool:

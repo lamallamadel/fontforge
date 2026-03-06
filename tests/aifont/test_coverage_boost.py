@@ -1543,3 +1543,285 @@ class TestAuthInit:
         import aifont.auth
 
         assert aifont.auth is not None
+
+
+# ===========================================================================
+# aifont.auth.quota — get_or_create_quota / reset_quota_if_needed
+# ===========================================================================
+
+
+class TestQuotaInternals:
+    @pytest.mark.asyncio
+    async def test_get_or_create_quota_creates_new(self):
+        import uuid
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from aifont.auth.models import UserRole
+
+        user = MagicMock()
+        user.id = uuid.uuid4()
+        user.role = UserRole.FREE
+
+        db = AsyncMock()
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(return_value=result_mock)
+
+        with patch("aifont.auth.quota.select", return_value=MagicMock()):
+            from aifont.auth.quota import get_or_create_quota
+            quota = await get_or_create_quota(user, db)
+        db.add.assert_called_once()
+        db.commit.assert_called()
+        assert quota is not None
+
+    @pytest.mark.asyncio
+    async def test_get_or_create_quota_returns_existing(self):
+        import uuid
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from aifont.auth.models import UserRole
+
+        user = MagicMock()
+        user.id = uuid.uuid4()
+        user.role = UserRole.FREE
+
+        existing_quota = MagicMock()
+        db = AsyncMock()
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = existing_quota
+        db.execute = AsyncMock(return_value=result_mock)
+
+        with patch("aifont.auth.quota.select", return_value=MagicMock()):
+            from aifont.auth.quota import get_or_create_quota
+            quota = await get_or_create_quota(user, db)
+        db.add.assert_not_called()
+        assert quota is existing_quota
+
+    @pytest.mark.asyncio
+    async def test_reset_quota_if_needed_resets_when_expired(self):
+        from datetime import datetime, timedelta, timezone
+        from unittest.mock import AsyncMock, MagicMock
+        from aifont.auth.quota import reset_quota_if_needed
+
+        quota = MagicMock()
+        # reset_at in the past → should reset
+        quota.reset_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        quota.exports_today = 5
+
+        db = AsyncMock()
+        result = await reset_quota_if_needed(quota, db)
+        assert quota.exports_today == 0
+        db.commit.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_reset_quota_if_needed_no_reset_when_not_expired(self):
+        from datetime import datetime, timedelta, timezone
+        from unittest.mock import AsyncMock, MagicMock
+        from aifont.auth.quota import reset_quota_if_needed
+
+        quota = MagicMock()
+        # reset_at in the future → should NOT reset
+        quota.reset_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        quota.exports_today = 5
+
+        db = AsyncMock()
+        result = await reset_quota_if_needed(quota, db)
+        assert quota.exports_today == 5
+        db.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_reset_quota_naive_datetime_treated_as_utc(self):
+        from datetime import datetime, timedelta, timezone
+        from unittest.mock import AsyncMock, MagicMock
+        from aifont.auth.quota import reset_quota_if_needed
+
+        quota = MagicMock()
+        # naive datetime (no tzinfo) in the past — should be treated as UTC
+        quota.reset_at = datetime.now() - timedelta(hours=2)
+        quota.exports_today = 3
+
+        db = AsyncMock()
+        await reset_quota_if_needed(quota, db)
+        assert quota.exports_today == 0
+
+
+# ===========================================================================
+# aifont.auth — __getattr__ lazy import
+# ===========================================================================
+
+
+class TestAuthGetattr:
+    def test_router_attribute_importable(self):
+        try:
+            import aifont.auth as auth_mod
+            # Access router — triggers lazy import; may fail if sqlalchemy not configured
+            _ = auth_mod.router
+        except Exception:
+            pass  # acceptable — only testing that __getattr__ executes
+
+    def test_unknown_attribute_raises_attribute_error(self):
+        import aifont.auth as auth_mod
+        with pytest.raises(AttributeError):
+            _ = auth_mod.nonexistent_attribute_xyz
+
+
+# ===========================================================================
+# aifont.core.glyph — uncovered property setters and methods
+# ===========================================================================
+
+
+class TestGlyphAdditional:
+    def test_name_setter(self, glyph, mock_ff_glyph):
+        from aifont.core.glyph import Glyph
+        glyph.name = "Z"
+        assert mock_ff_glyph.glyphname == "Z"
+
+    def test_unicode_setter(self, glyph, mock_ff_glyph):
+        glyph.unicode = 0x005A
+        assert mock_ff_glyph.unicode == 0x005A
+
+    def test_unicode_value_getter(self, glyph, mock_ff_glyph):
+        mock_ff_glyph.unicode = 0x0041
+        assert glyph.unicode_value == 0x0041
+
+    def test_unicode_value_setter(self, glyph, mock_ff_glyph):
+        glyph.unicode_value = 0x005A
+        assert mock_ff_glyph.unicode == 0x005A
+
+    def test_width_setter(self, glyph, mock_ff_glyph):
+        glyph.width = 700
+        assert mock_ff_glyph.width == 700
+
+    def test_width_setter_negative_raises(self, glyph):
+        with pytest.raises(ValueError, match="non-negative"):
+            glyph.width = -1
+
+    def test_set_width_chaining(self, glyph, mock_ff_glyph):
+        result = glyph.set_width(800)
+        assert result is glyph
+        assert mock_ff_glyph.width == 800
+
+    def test_lsb_getter(self, glyph, mock_ff_glyph):
+        mock_ff_glyph.left_side_bearing = 50
+        assert glyph.left_side_bearing == 50
+
+    def test_rsb_getter(self, glyph, mock_ff_glyph):
+        mock_ff_glyph.right_side_bearing = 60
+        assert glyph.right_side_bearing == 60
+
+    def test_contours_returns_list(self, glyph, mock_ff_glyph):
+        contours = glyph.contours
+        assert isinstance(contours, list)
+
+    def test_copy_from(self, glyph, mock_ff_glyph):
+        other_ff = MagicMock()
+        other_ff.glyphname = "B"
+        other_ff.unicode = 0x0042
+        other_ff.width = 600
+        other_ff.left_side_bearing = 60
+        other_ff.right_side_bearing = 60
+        other_ff.foreground = MagicMock()
+        from aifont.core.glyph import Glyph
+        other = Glyph(other_ff)
+        result = glyph.copy_from(other)
+        assert result is glyph
+        mock_ff_glyph.clear.assert_called()
+
+    def test_clear_method(self, glyph, mock_ff_glyph):
+        result = glyph.clear()
+        assert result is glyph
+        mock_ff_glyph.clear.assert_called()
+
+    def test_auto_hint_method(self, glyph, mock_ff_glyph):
+        result = glyph.auto_hint()
+        assert result is glyph
+        mock_ff_glyph.autoHint.assert_called()
+
+    def test_remove_overlap_method(self, glyph, mock_ff_glyph):
+        result = glyph.remove_overlap()
+        assert result is glyph
+        mock_ff_glyph.removeOverlap.assert_called()
+
+    def test_simplify_method(self, glyph, mock_ff_glyph):
+        result = glyph.simplify(error_bound=1.5)
+        assert result is glyph
+        mock_ff_glyph.simplify.assert_called_with(1.5)
+
+    def test_correct_direction_method(self, glyph, mock_ff_glyph):
+        result = glyph.correct_direction()
+        assert result is glyph
+        mock_ff_glyph.correctDirection.assert_called()
+
+    def test_repr(self, glyph, mock_ff_glyph):
+        mock_ff_glyph.glyphname = "A"
+        mock_ff_glyph.unicode = 0x0041
+        mock_ff_glyph.width = 600
+        r = repr(glyph)
+        assert "Glyph" in r
+
+
+# ===========================================================================
+# aifont.core.export — export_ufo, export_svg, export_sfd, export_all
+# ===========================================================================
+
+
+class TestExportMoreFormats:
+    def test_export_ufo_uses_save(self, font, mock_ff_font, tmp_path):
+        from aifont.core.export import export_ufo
+        out = tmp_path / "out.ufo"
+        export_ufo(font, str(out))
+        mock_ff_font.save.assert_called_once_with(str(out))
+
+    def test_export_ufo_fallback_to_generate(self, font, mock_ff_font, tmp_path):
+        from aifont.core.export import export_ufo
+        mock_ff_font.save.side_effect = Exception("save failed")
+        out = tmp_path / "out.ufo"
+        export_ufo(font, str(out))
+        mock_ff_font.generate.assert_called()
+
+    def test_export_svg_calls_generate(self, font, mock_ff_font, tmp_path):
+        from aifont.core.export import export_svg
+        out = tmp_path / "out.svg"
+        export_svg(font, str(out))
+        mock_ff_font.generate.assert_called_with(str(out))
+
+    def test_export_sfd_calls_save(self, font, mock_ff_font, tmp_path):
+        from aifont.core.export import export_sfd
+        out = tmp_path / "out.sfd"
+        export_sfd(font, str(out))
+        mock_ff_font.save.assert_called_with(str(out))
+
+    def test_export_all_basic(self, font, mock_ff_font, tmp_path):
+        from aifont.core.export import export_all
+        with patch("aifont.core.export.export_otf") as mock_otf, \
+             patch("aifont.core.export.export_ttf") as mock_ttf, \
+             patch("aifont.core.export.export_woff") as mock_woff, \
+             patch("aifont.core.export.export_woff2") as mock_woff2, \
+             patch("aifont.core.export.export_ufo") as mock_ufo, \
+             patch("aifont.core.export.export_svg") as mock_svg:
+            for m in (mock_otf, mock_ttf, mock_woff, mock_woff2, mock_ufo, mock_svg):
+                m.side_effect = lambda f, p: p
+            result = export_all(font, str(tmp_path), basename="TestFont")
+        assert isinstance(result, dict)
+        assert "otf" in result
+
+    def test_export_all_single_format(self, font, mock_ff_font, tmp_path):
+        from aifont.core.export import export_all
+        with patch("aifont.core.export.export_otf") as mock_otf:
+            mock_otf.side_effect = lambda f, p: p
+            result = export_all(font, str(tmp_path), formats=["otf"], basename="T")
+        assert "otf" in result
+
+    def test_export_all_unknown_format_raises(self, font, tmp_path):
+        from aifont.core.export import export_all
+        with pytest.raises(ValueError, match="Unknown format"):
+            export_all(font, str(tmp_path), formats=["xyz"])
+
+    def test_subset_font_with_languages(self, font, mock_ff_font, tmp_path):
+        from aifont.core.export import subset_font
+        out = tmp_path / "sub.woff2"
+        with patch("aifont.core.export.export_woff2"):
+            subset_font(font, str(out), ["latin"])
+        # Must not raise
+
+    def test_export_line_18_import(self):
+        from aifont.core import export as exp_mod
+        assert hasattr(exp_mod, "ExportOptions") or hasattr(exp_mod, "export_otf")

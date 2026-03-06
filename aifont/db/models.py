@@ -156,7 +156,7 @@ class FontProject(TimestampMixin, Base):
     )
 
     # Relationships
-    user = relationship("User", back_populates="projects")
+    user = relationship("User")
     fonts = relationship("Font", back_populates="project", cascade="all, delete-orphan")
     agent_runs = relationship("AgentRun", back_populates="project", cascade="all, delete-orphan")
 
