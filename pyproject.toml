@@ -169,3 +169,15 @@ before-build = "pip install delvewheel"
 
 # Repair wheels with delvewheel, adding vcpkg DLL path
 repair-wheel-command = "delvewheel repair --add-path C:/vcpkg/installed/x64-windows/bin -w {dest_dir} {wheel}"
+
+# ============================================================================
+# pytest configuration
+# ============================================================================
+
+[tool.pytest.ini_options]
+# Add the repository root to sys.path so `import aifont` works without install
+pythonpath = ["."]
+testpaths = ["tests"]
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
