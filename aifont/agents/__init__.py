@@ -1,3 +1,4 @@
+"""aifont.agents — AI agent layer built on top of aifont.core."""
 """aifont.agents — multi-agent AI layer for font generation and analysis."""
 """AIFont agents — AI-powered font operations built on aifont.core."""
 

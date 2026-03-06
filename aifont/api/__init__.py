@@ -1,3 +1,4 @@
+"""aifont.api — FastAPI REST server exposing AIFont as a service."""
 """aifont.api — FastAPI server exposing the AIFont SDK as a REST service."""
 
 from .main import create_app
