@@ -106,13 +106,17 @@ class Glyph:
     def copy_from(self, other: "Glyph") -> None:
         """Copy contour data from *other* into this glyph.
 
+        Uses fontforge's built-in copy/paste mechanism to transfer all
+        foreground layer outlines from *other* to this glyph.
+
         Parameters
         ----------
         other:
             The source glyph to copy from.
         """
         self._ff_glyph.clear()
-        self._ff_glyph.addReference(other.name)
+        other._ff_glyph.copy()
+        self._ff_glyph.paste()
 
     # ------------------------------------------------------------------
     # Dunder helpers

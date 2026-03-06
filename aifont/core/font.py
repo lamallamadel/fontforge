@@ -67,7 +67,7 @@ class Font:
                 "fontforge Python bindings are not installed. "
                 "Install FontForge to use Font.open()."
             )
-        resolved = Path(path)
+        resolved = Path(path).resolve()
         if not resolved.exists():
             raise FileNotFoundError(f"Font file not found: {path!r}")
         return cls(_ff.open(str(resolved)))
