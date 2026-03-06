@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import type { Glyph, GlyphPoint, GlyphContour, Tool } from '../../api/types';
 
 interface GlyphEditorProps {
@@ -31,15 +31,19 @@ function xCanvasToUnit(cx: number): number {
 
 export function GlyphEditor({ glyph, tool, onChange }: GlyphEditorProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // Track previous glyph id as state to sync contours when glyph selection changes
+  const [prevGlyphId, setPrevGlyphId] = useState<string | null>(glyph?.id ?? null);
   const [contours, setContours] = useState<GlyphContour[]>(glyph?.contours ?? []);
   const [activeContourIdx, setActiveContourIdx] = useState<number>(-1);
   const [selectedPointIdx, setSelectedPointIdx] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [zoom, setZoom] = useState(1);
 
-  useEffect(() => {
-    if (glyph) setContours(glyph.contours);
-  }, [glyph]);
+  // React-recommended pattern: adjust state during rendering when a prop changes
+  if (glyph && glyph.id !== prevGlyphId) {
+    setPrevGlyphId(glyph.id);
+    setContours(glyph.contours);
+  }
 
   const getSVGPoint = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = svgRef.current;

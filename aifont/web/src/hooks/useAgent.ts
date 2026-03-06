@@ -24,7 +24,7 @@ export function useAgent() {
         };
         addPromptHistory(historyItem);
         return result;
-      } catch (e) {
+      } catch {
         setError('Agent request failed');
         return null;
       } finally {

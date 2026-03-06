@@ -16,7 +16,7 @@ export function useFont() {
         const data = await fontApi.getFont(id);
         setActiveProject(data);
         return data;
-      } catch (e) {
+      } catch {
         setError('Failed to fetch font');
         return null;
       } finally {

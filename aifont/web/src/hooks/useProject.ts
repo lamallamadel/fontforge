@@ -15,7 +15,7 @@ export function useProject(projectId?: string) {
     try {
       const data = await fontApi.listFonts();
       setProjects(data);
-    } catch (e) {
+    } catch {
       setError('Failed to load projects');
     } finally {
       setLoading(false);
@@ -30,7 +30,7 @@ export function useProject(projectId?: string) {
         const data = await fontApi.getFont(id);
         setActiveProject(data);
         updateProject(id, data);
-      } catch (e) {
+      } catch {
         setError('Failed to load project');
       } finally {
         setLoading(false);
@@ -47,7 +47,7 @@ export function useProject(projectId?: string) {
         const project = await fontApi.createFont(data);
         addProject(project);
         return project;
-      } catch (e) {
+      } catch {
         setError('Failed to create project');
         return null;
       } finally {
@@ -62,7 +62,7 @@ export function useProject(projectId?: string) {
       try {
         await fontApi.deleteFont(id);
         removeProject(id);
-      } catch (e) {
+      } catch {
         setError('Failed to delete project');
       }
     },
