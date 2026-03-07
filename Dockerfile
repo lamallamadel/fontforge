@@ -16,8 +16,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3.11 \
         python3.11-dev \
+        python3.11-venv \
         python3-pip \
-        python3-venv \
         fontforge \
         python3-fontforge \
         # Build tools
@@ -50,9 +50,10 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3.11 \
+        python3.11-distutils \
         python3-fontforge \
         fontforge \
-        libfontforge3 \
+        libfontforge4 \
         # Health-check tooling
         curl \
     && rm -rf /var/lib/apt/lists/*
@@ -74,7 +75,7 @@ RUN SITE=$(python3.11 -c "import sysconfig; print(sysconfig.get_path('platlib'))
     ln -sf "$SITE/psMat.so" "$VENV_SITE/psMat.so" 2>/dev/null || true
 
 # Install aifont itself in editable mode so changes are picked up.
-RUN pip install --no-cache-dir -e ".[api]"
+RUN pip install --no-cache-dir -e "./aifont[api]"
 
 # Non-root user for security.
 RUN groupadd -r aifont && useradd -r -g aifont aifont
