@@ -54,6 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-fontforge \
         fontforge \
         libfontforge4 \
+        ca-certificates \
         # Health-check tooling
         curl \
     && rm -rf /var/lib/apt/lists/*
