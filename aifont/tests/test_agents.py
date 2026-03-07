@@ -436,7 +436,9 @@ class TestExportAgent:
 
         from aifont.agents.export_agent import FormatValidation
 
-        fv = FormatValidation(format="woff2", path=Path("/tmp/f.woff2"), file_size_bytes=100, passed=True)
+        fv = FormatValidation(
+            format="woff2", path=Path("/tmp/f.woff2"), file_size_bytes=100, passed=True
+        )
         assert fv.passed is True
         assert fv.format == "woff2"
 
@@ -734,7 +736,9 @@ class TestExportAgentMorePaths:
         agent = ExportAgent()
         font = _make_font_wrapper()
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("aifont.agents.export_agent.export_woff2", return_value=Path(tmpdir) / "x.woff2"):
+            with patch(
+                "aifont.agents.export_agent.export_woff2", return_value=Path(tmpdir) / "x.woff2"
+            ):
                 result = agent._export_format(font, "woff2", Path(tmpdir), "TestFont", [])
             assert result is not None
 
@@ -781,6 +785,7 @@ class TestQAAgentMorePaths:
 
     def test_run_without_font(self):
         from aifont.agents.qa_agent import QAAgent, QAReport
+
         agent = QAAgent()
         result = agent.run()
         assert isinstance(result, QAReport)
@@ -791,9 +796,7 @@ class TestQAAgentMorePaths:
 
         font = _make_font_wrapper()
         report = FontReport(
-            issues=[
-                GlyphIssue(glyph_name="A", issue_type="open_contour", severity="warning")
-            ]
+            issues=[GlyphIssue(glyph_name="A", issue_type="open_contour", severity="warning")]
         )
         agent = QAAgent(font=font, auto_fix=True)
         with patch("aifont.agents.qa_agent.analyze", return_value=report):
@@ -802,5 +805,6 @@ class TestQAAgentMorePaths:
 
     def test_check_result_init(self):
         from aifont.agents.qa_agent import CheckResult
+
         cr = CheckResult(name="test", passed=True)
         assert cr.passed is True

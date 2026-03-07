@@ -143,12 +143,12 @@ class Glyph:
     # ------------------------------------------------------------------
 
     @property
-    def contours(self) -> Any:
-        """Return the foreground layer (contour container) for this glyph."""
+    def contours(self) -> list:
+        """Return the list of contours from the foreground layer."""
         fg = getattr(self._ff, "foreground", None)
         if fg is None:
             return []
-        return fg
+        return list(fg)
 
     @property
     def has_open_contours(self) -> bool:
@@ -233,7 +233,10 @@ class Glyph:
             flags:       Tuple of flag strings passed to fontforge ``simplify()``.
         """
         if hasattr(self._ff, "simplify"):
-            self._ff.simplify(error_bound, flags)  # type: ignore[union-attr]
+            if flags:
+                self._ff.simplify(error_bound, flags)  # type: ignore[union-attr]
+            else:
+                self._ff.simplify(error_bound)  # type: ignore[union-attr]
         return self
 
     def correct_direction(self) -> Glyph:

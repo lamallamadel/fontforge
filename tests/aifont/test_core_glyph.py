@@ -95,3 +95,64 @@ class TestGlyph:
         ff.unicode = -1
         g = Glyph(ff)
         assert g.unicode == -1
+
+    def test_width_negative_raises(self):
+        ff = MagicMock()
+        ff.width = 600
+        g = Glyph(ff)
+        with pytest.raises(ValueError):
+            g.width = -1
+
+    def test_has_open_contours_false_when_no_foreground(self):
+        ff = MagicMock(spec=[])  # no attributes at all
+        g = Glyph(ff)
+        assert g.has_open_contours is False
+
+    def test_has_open_contours_all_closed(self, mock_ff_glyph):
+        c1 = MagicMock()
+        c1.closed = True
+        c2 = MagicMock()
+        c2.closed = True
+        mock_ff_glyph.foreground.__iter__ = MagicMock(return_value=iter([c1, c2]))
+        g = Glyph(mock_ff_glyph)
+        assert g.has_open_contours is False
+
+    def test_has_open_contours_one_open(self, mock_ff_glyph):
+        c1 = MagicMock()
+        c1.closed = True
+        c2 = MagicMock()
+        c2.closed = False
+        mock_ff_glyph.foreground.__iter__ = MagicMock(return_value=iter([c1, c2]))
+        g = Glyph(mock_ff_glyph)
+        assert g.has_open_contours is True
+
+    def test_has_open_contours_exception_returns_false(self, mock_ff_glyph):
+        mock_ff_glyph.foreground.__iter__ = MagicMock(side_effect=RuntimeError("boom"))
+        g = Glyph(mock_ff_glyph)
+        assert g.has_open_contours is False
+
+    def test_simplify_with_flags(self, glyph, mock_ff_glyph):
+        result = glyph.simplify(error_bound=2.0, flags=("removeextranodes",))
+        assert result is glyph
+        mock_ff_glyph.simplify.assert_called_with(2.0, ("removeextranodes",))
+
+    def test_remove_overlap(self, glyph, mock_ff_glyph):
+        result = glyph.remove_overlap()
+        assert result is glyph
+        mock_ff_glyph.removeOverlap.assert_called_once()
+
+    def test_correct_direction(self, glyph, mock_ff_glyph):
+        result = glyph.correct_direction()
+        assert result is glyph
+        mock_ff_glyph.correctDirection.assert_called_once()
+
+    def test_round_to_int(self, glyph, mock_ff_glyph):
+        result = glyph.round_to_int()
+        assert result is glyph
+        mock_ff_glyph.round.assert_called_once()
+
+    def test_transform(self, glyph, mock_ff_glyph):
+        matrix = (1, 0, 0, 1, 10, 20)
+        result = glyph.transform(matrix)
+        assert result is glyph
+        mock_ff_glyph.transform.assert_called_with(matrix)
